@@ -1,0 +1,22 @@
+{
+  "name": "testing",
+  "displayName": "Testing (Vitest + Vue Testing Library)",
+  "description": "Adds Vitest with Vue Testing Library",
+  "dependencies": {},
+  "devDependencies": {
+    "@testing-library/vue": "^8.1.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/user-event": "^14.6.0",
+    "jsdom": "^26.1.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "files": [
+    "vitest.config.ts",
+    "tests/example.test.ts"
+  ],
+  "postInstallMessage": "Vitest + Vue Testing Library configured. Run `pnpm test` to verify."
+}

@@ -1,0 +1,20 @@
+{
+  "name": "testing",
+  "displayName": "Testing (Vitest + NestJS Testing)",
+  "description": "Adds Vitest configured for NestJS with @nestjs/testing",
+  "dependencies": {},
+  "devDependencies": {
+    "supertest": "^7.1.0",
+    "@types/supertest": "^6.0.3"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "files": [
+    "vitest.config.ts",
+    "src/app.module.spec.ts"
+  ],
+  "postInstallMessage": "Vitest configured for NestJS. Run `pnpm test` to verify."
+}

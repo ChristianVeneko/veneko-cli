@@ -1,0 +1,23 @@
+{
+  "name": "astro",
+  "displayName": "Astro",
+  "category": "frontend",
+  "description": "Astro with Screaming Architecture",
+  "architecture": "screaming",
+  "dependencies": {
+    "astro": "^5.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dynamicFiles": [
+    "src/pages/index.astro.ejs",
+    "src/layouts/Layout.astro.ejs"
+  ],
+  "supportedFeatures": ["testing"]
+}

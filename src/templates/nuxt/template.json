@@ -1,0 +1,25 @@
+{
+  "name": "nuxt",
+  "displayName": "Nuxt 3",
+  "category": "frontend",
+  "description": "Nuxt 3 with Screaming Architecture",
+  "architecture": "screaming",
+  "dependencies": {
+    "nuxt": "^3.16.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dynamicFiles": [
+    "nuxt.config.ts.ejs",
+    "app.vue.ejs",
+    "pages/index.vue.ejs"
+  ],
+  "supportedFeatures": ["db-postgres", "db-mysql", "db-sqlite", "auth", "testing"]
+}

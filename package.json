@@ -1,0 +1,30 @@
+{
+  "name": "veneko-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "veneko": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "postbuild": "node -e \"const fs=require('fs');fs.cpSync('src/templates','dist/templates',{recursive:true})\"",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "link": "npm link"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "@clack/prompts": "^0.9.1",
+    "ejs": "^3.1.10",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "tsup": "^8.5.1",
+    "@types/node": "^22.0.0",
+    "@types/ejs": "^3.1.5",
+    "vitest": "^3.2.0"
+  }
+}

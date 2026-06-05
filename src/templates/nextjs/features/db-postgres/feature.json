@@ -1,0 +1,26 @@
+{
+  "name": "db-postgres",
+  "displayName": "PostgreSQL with Drizzle ORM",
+  "description": "Adds Drizzle ORM with PostgreSQL driver and Docker Compose",
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "files": [
+    "docker-compose.yml",
+    ".env.example",
+    "src/db/schema.ts",
+    "src/db/index.ts",
+    "drizzle.config.ts"
+  ],
+  "postInstallMessage": "PostgreSQL setup ready. Run `docker compose up -d` to start the database, then copy .env.example to .env and run `pnpm db:push`."
+}

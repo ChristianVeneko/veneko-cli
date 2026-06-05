@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+
+# build output
+dist/
+
+# native keys & certs
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# type checking cache
+*.tsbuildinfo

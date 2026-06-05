@@ -1,0 +1,31 @@
+{
+  "name": "nestjs",
+  "displayName": "NestJS",
+  "category": "backend",
+  "description": "NestJS with Clean Hexagonal Architecture",
+  "architecture": "clean-hexagonal",
+  "dependencies": {
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "scripts": {
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "build": "nest build"
+  },
+  "dynamicFiles": [
+    "src/main.ts.ejs"
+  ],
+  "supportedFeatures": ["db-postgres", "db-mysql", "db-sqlite", "auth", "testing"]
+}

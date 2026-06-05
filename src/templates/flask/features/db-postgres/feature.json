@@ -1,0 +1,15 @@
+{
+  "name": "db-postgres",
+  "displayName": "PostgreSQL with SQLAlchemy",
+  "description": "Adds SQLAlchemy with PostgreSQL driver (psycopg2) and Docker Compose",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {},
+  "files": [
+    "docker-compose.yml",
+    ".env.example",
+    "src/infrastructure/database.py",
+    "src/infrastructure/models.py"
+  ],
+  "postInstallMessage": "PostgreSQL setup ready. Add `sqlalchemy` and `psycopg2-binary` to requirements.txt, run `docker compose up -d`, then copy .env.example to .env."
+}

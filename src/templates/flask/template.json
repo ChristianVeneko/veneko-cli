@@ -1,0 +1,15 @@
+{
+  "name": "flask",
+  "displayName": "Flask (Python)",
+  "category": "backend",
+  "description": "Flask with Clean Hexagonal Architecture",
+  "architecture": "clean-hexagonal",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {},
+  "dynamicFiles": [
+    "pyproject.toml.ejs",
+    "src/app/__init__.py.ejs"
+  ],
+  "supportedFeatures": ["db-postgres", "db-mysql", "db-sqlite", "auth", "testing"]
+}

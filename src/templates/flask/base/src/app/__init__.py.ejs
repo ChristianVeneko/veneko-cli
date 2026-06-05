@@ -1,0 +1,19 @@
+from flask import Flask
+from dotenv import load_dotenv
+
+
+def create_app() -> Flask:
+    load_dotenv()
+
+    app = Flask(__name__)
+    app.config.from_object("src.app.config.DevelopmentConfig")
+
+    # Register blueprints here
+    # from src.adapters.api.routes.health import health_bp
+    # app.register_blueprint(health_bp)
+
+    @app.get("/")
+    def index():
+        return {"message": "<%= projectName %> is running"}
+
+    return app

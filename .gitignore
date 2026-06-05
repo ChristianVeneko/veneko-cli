@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env.local
+.atl/
+.claude/
+pnpm-lock.yaml
+pnpm-workspace.yaml

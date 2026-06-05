@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# virtual environment
+.venv/
+venv/
+env/
+
+# environment variables
+.env
+
+# build/dist
+dist/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# mypy / ruff / pytest cache
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

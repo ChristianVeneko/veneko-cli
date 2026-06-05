@@ -1,0 +1,23 @@
+{
+  "name": "testing",
+  "displayName": "Testing (Vitest + Testing Library)",
+  "description": "Adds Vitest with React Testing Library",
+  "dependencies": {},
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/user-event": "^14.6.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "jsdom": "^26.1.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "files": [
+    "vitest.config.ts",
+    "src/tests/example.test.tsx"
+  ],
+  "postInstallMessage": "Vitest + Testing Library configured. Run `pnpm test` to verify."
+}

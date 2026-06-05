@@ -1,0 +1,14 @@
+{
+  "name": "db-sqlite",
+  "displayName": "SQLite with SQLAlchemy",
+  "description": "Adds SQLAlchemy with SQLite (built-in, no Docker needed)",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {},
+  "files": [
+    ".env.example",
+    "src/infrastructure/database.py",
+    "src/infrastructure/models.py"
+  ],
+  "postInstallMessage": "SQLite setup ready. Add `sqlalchemy` to requirements.txt, then copy .env.example to .env."
+}

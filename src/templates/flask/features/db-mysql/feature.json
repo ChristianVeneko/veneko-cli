@@ -1,0 +1,15 @@
+{
+  "name": "db-mysql",
+  "displayName": "MySQL with SQLAlchemy",
+  "description": "Adds SQLAlchemy with MySQL driver (PyMySQL) and Docker Compose",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {},
+  "files": [
+    "docker-compose.yml",
+    ".env.example",
+    "src/infrastructure/database.py",
+    "src/infrastructure/models.py"
+  ],
+  "postInstallMessage": "MySQL setup ready. Add `sqlalchemy` and `pymysql` to requirements.txt, run `docker compose up -d`, then copy .env.example to .env."
+}

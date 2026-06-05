@@ -1,0 +1,26 @@
+{
+  "name": "db-sqlite",
+  "displayName": "SQLite with Drizzle ORM",
+  "description": "Adds Drizzle ORM with better-sqlite3 driver (no Docker needed)",
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "@types/better-sqlite3": "^7.6.13"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "files": [
+    ".env.example",
+    "src/db/schema.ts",
+    "src/db/index.ts",
+    "drizzle.config.ts"
+  ],
+  "postInstallMessage": "SQLite setup ready. Copy .env.example to .env and run `pnpm db:push` to create the database file."
+}

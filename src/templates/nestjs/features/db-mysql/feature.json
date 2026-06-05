@@ -1,0 +1,26 @@
+{
+  "name": "db-mysql",
+  "displayName": "MySQL with Drizzle ORM",
+  "description": "Adds Drizzle ORM with MySQL driver and Docker Compose (hexagonal infrastructure layer)",
+  "dependencies": {
+    "drizzle-orm": "^0.44.0",
+    "mysql2": "^3.12.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "files": [
+    "docker-compose.yml",
+    ".env.example",
+    "src/infrastructure/database/schema.ts",
+    "src/infrastructure/database/index.ts",
+    "drizzle.config.ts"
+  ],
+  "postInstallMessage": "MySQL setup ready. Run `docker compose up -d` to start the database, then copy .env.example to .env and run `pnpm db:push`."
+}
