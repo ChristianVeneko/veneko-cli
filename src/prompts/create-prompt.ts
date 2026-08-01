@@ -1,8 +1,10 @@
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import * as p from "@clack/prompts";
+import pc from "picocolors";
 import { getTemplatesDir } from "../utils/paths.js";
 import { toKebabCase } from "../utils/name-utils.js";
+import { c } from "../utils/logger.js";
 import type { CreateConfig, TemplateManifest, DatabaseOption, PackageManager } from "../types/index.js";
 
 interface TemplateOption {
@@ -65,7 +67,10 @@ export async function runCreatePrompt(): Promise<CreateConfig> {
   const templates = await discoverTemplates();
 
   if (templates.length === 0) {
-    p.cancel("No templates found. Make sure the templates directory exists.");
+    p.cancel(
+      `${c.error("✖")} No templates found.\n` +
+      pc.dim("  Make sure the templates directory exists and your veneko installation is intact.")
+    );
     process.exit(1);
   }
 
@@ -142,16 +147,16 @@ export async function runCreatePrompt(): Promise<CreateConfig> {
   const outputDir = join(process.cwd(), safeName);
 
   const summary = [
-    `Project:    ${safeName}`,
-    `Template:   ${selectedTemplate?.label ?? (template as string)}`,
-    `Database:   ${database}`,
-    `PM:         ${packageManager as string}`,
-    `Git:        ${initGit ? "yes" : "no"}`,
-    `CLAUDE.md:  ${generateClaudeMd ? "yes" : "no"}`,
-    `Output:     ${outputDir}`,
+    `${pc.bold("Project")}     ${c.highlight(safeName)}`,
+    `${pc.bold("Template")}    ${c.info(selectedTemplate?.label ?? (template as string))}`,
+    `${pc.bold("Database")}    ${database === "none" ? pc.dim("none") : c.info(database)}`,
+    `${pc.bold("Manager")}     ${c.info(packageManager as string)}`,
+    `${pc.bold("Git")}         ${(initGit as boolean) ? c.success("yes") : pc.dim("no")}`,
+    `${pc.bold("CLAUDE.md")}   ${(generateClaudeMd as boolean) ? c.success("yes") : pc.dim("no")}`,
+    `${pc.bold("Output")}      ${pc.dim(outputDir)}`,
   ].join("\n");
 
-  p.note(summary, "Project summary");
+  p.note(summary, pc.bold("▸ Project summary"));
 
   const proceed = await p.confirm({
     message: "Create project?",
