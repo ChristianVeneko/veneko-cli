@@ -4,6 +4,8 @@
   "description": "Adds Vitest configured for NestJS with @nestjs/testing",
   "dependencies": {},
   "devDependencies": {
+    "vitest": "^3.2.0",
+    "@nestjs/testing": "^11.0.0",
     "supertest": "^7.1.0",
     "@types/supertest": "^6.0.3"
   },
