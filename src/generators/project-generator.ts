@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "fs/promises";
 import { join, dirname } from "path";
 import * as p from "@clack/prompts";
+import pc from "picocolors";
 import { getTemplatesDir } from "../utils/paths.js";
 import { ensureDir } from "../utils/fs.js";
 import { install } from "../utils/package-manager.js";
@@ -9,6 +10,7 @@ import { renderTemplate } from "./template-renderer.js";
 import { generateClaudeMd } from "./claude-md-generator.js";
 import { toKebabCase, toPascalCase, toCamelCase } from "../utils/name-utils.js";
 import { applyFeature } from "./feature-generator.js";
+import { c } from "../utils/logger.js";
 import type { CreateConfig, TemplateManifest, TemplateContext, FeatureName } from "../types/index.js";
 
 const COMMON_DEV_DEPS: Record<string, string> = {
@@ -55,15 +57,24 @@ async function loadManifest(templateName: string): Promise<TemplateManifest> {
   return JSON.parse(raw) as TemplateManifest;
 }
 
+const ESM_TEMPLATES = new Set(["nextjs", "nuxt", "vite", "vue", "astro"]);
+
 function buildPackageJson(
   config: CreateConfig,
   manifest: TemplateManifest
 ): Record<string, unknown> {
-  return {
+  const pkg: Record<string, unknown> = {
     name: config.projectName,
     version: "0.1.0",
     private: true,
-    type: "module",
+  };
+
+  if (ESM_TEMPLATES.has(config.template)) {
+    pkg.type = "module";
+  }
+
+  return {
+    ...pkg,
     scripts: {
       ...manifest.scripts,
       ...COMMON_SCRIPTS,
@@ -115,17 +126,20 @@ export async function generateProject(config: CreateConfig): Promise<void> {
 
   await renderTemplate(baseDir, outputDir, context);
 
+  const pkgJson = buildPackageJson(config, manifest);
+  await writeJson(join(outputDir, "package.json"), pkgJson);
+
+  let dbPostInstallMessage: string | undefined;
   if (config.database !== "none") {
     const featureName = `db-${config.database}` as FeatureName;
     try {
-      await applyFeature(template, featureName, outputDir, context);
+      dbPostInstallMessage = await applyFeature(template, featureName, outputDir, context);
     } catch {
-      p.log.warn(`DB feature overlay for "${config.database}" not found — skipping.`);
+      p.log.warn(
+        `${c.warn("⚠")} DB feature overlay for ${c.highlight(config.database)} not found — skipping.`
+      );
     }
   }
-
-  const pkgJson = buildPackageJson(config, manifest);
-  await writeJson(join(outputDir, "package.json"), pkgJson);
 
   await writeJson(join(outputDir, "biome.json"), BIOME_CONFIG);
 
@@ -137,22 +151,32 @@ export async function generateProject(config: CreateConfig): Promise<void> {
   }
 
   const s = p.spinner();
-  s.start(`Installing dependencies with ${packageManager}...`);
+  s.start(`${c.dim("▸")} Installing dependencies with ${c.highlight(packageManager)}...`);
   try {
     await install(packageManager, outputDir);
-    s.stop("Dependencies installed.");
+    s.stop(`${c.success("✔")} Dependencies installed.`);
   } catch {
-    s.stop("Install failed — run the install command manually.");
+    s.stop(`${c.warn("⚠")} Install failed.`);
+    p.log.warn(
+      `Run ${c.highlight(`${packageManager} install`)} inside ${c.highlight(projectName)} to install dependencies.`
+    );
   }
 
   if (initGit) {
     const gs = p.spinner();
-    gs.start("Initializing git repository...");
+    gs.start(`${c.dim("▸")} Initializing git repository...`);
     try {
       await initGitRepo(outputDir, true);
-      gs.stop("Git repository initialized.");
+      gs.stop(`${c.success("✔")} Git repository initialized with initial commit.`);
     } catch {
-      gs.stop("Git init failed — run git init manually.");
+      gs.stop(`${c.warn("⚠")} Git init failed.`);
+      p.log.warn(
+        `Run ${c.highlight("git init")} inside ${c.highlight(projectName)} to initialize git manually.`
+      );
     }
+  }
+
+  if (dbPostInstallMessage) {
+    p.note(dbPostInstallMessage, pc.bold("▸ Database setup notes"));
   }
 }
