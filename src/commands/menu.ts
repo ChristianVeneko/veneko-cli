@@ -5,8 +5,11 @@ import { runCreate } from "./create.js";
 import { runAdd } from "./add.js";
 import { runTools } from "./tools.js";
 import { runConfig } from "./config.js";
+import { runDoctor } from "./doctor.js";
+import { runUpdate } from "./update.js";
+import { VERSION } from "../utils/version.js";
 
-type MenuAction = "create" | "add" | "tools" | "config" | "exit";
+type MenuAction = "create" | "add" | "tools" | "config" | "doctor" | "update" | "exit";
 
 const MENU_OPTIONS: { value: MenuAction; label: string; hint: string }[] = [
   {
@@ -30,6 +33,16 @@ const MENU_OPTIONS: { value: MenuAction; label: string; hint: string }[] = [
     hint: "credentials and defaults",
   },
   {
+    value: "doctor",
+    label: "Doctor",
+    hint: "check this machine's setup",
+  },
+  {
+    value: "update",
+    label: "Update",
+    hint: "install the latest release",
+  },
+  {
     value: "exit",
     label: "Exit",
     hint: "close veneko",
@@ -39,7 +52,7 @@ const MENU_OPTIONS: { value: MenuAction; label: string; hint: string }[] = [
 export async function runInteractiveMenu(): Promise<void> {
   printBanner("personal CLI tool for project scaffolding");
 
-  p.intro(pc.bold(pc.cyan(" veneko ")));
+  p.intro(pc.bold(pc.cyan(` veneko v${VERSION} `)));
 
   // Tools and configuration return to this menu; create and add end the session.
   for (;;) {
@@ -66,6 +79,12 @@ export async function runInteractiveMenu(): Promise<void> {
       case "config":
         await runConfig({ fromMenu: true });
         break;
+      case "doctor":
+        await runDoctor({ fromMenu: true });
+        break;
+      case "update":
+        await runUpdate({ fromMenu: true });
+        return;
     }
   }
 }
