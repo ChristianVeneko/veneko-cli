@@ -54,6 +54,14 @@ export interface TemplateContext {
   year: number;
 }
 
+export interface CommandRunOptions {
+  /**
+   * True when the command was launched from the interactive menu, which already
+   * printed the banner and opened the prompt session.
+   */
+  fromMenu?: boolean;
+}
+
 export interface DetectedProject {
   framework: string;
   packageManager: PackageManager;

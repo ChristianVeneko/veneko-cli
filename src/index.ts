@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { registerCreateCommand } from "./commands/create.js";
 import { registerAddCommand } from "./commands/add.js";
+import { runInteractiveMenu } from "./commands/menu.js";
 
 const program = new Command();
 
@@ -12,4 +13,14 @@ program
 registerCreateCommand(program);
 registerAddCommand(program);
 
-program.parse();
+const hasArgs = process.argv.slice(2).length > 0;
+const isInteractive = process.stdin.isTTY === true && process.stdout.isTTY === true;
+
+if (hasArgs) {
+  program.parse();
+} else if (isInteractive) {
+  await runInteractiveMenu();
+} else {
+  // No arguments and no terminal to draw a menu on (piped input, CI, etc.).
+  program.outputHelp();
+}
