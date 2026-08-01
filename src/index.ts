@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import { registerCreateCommand } from "./commands/create.js";
 import { registerAddCommand } from "./commands/add.js";
+import { registerToolsCommand } from "./commands/tools.js";
+import { registerConfigCommand } from "./commands/config.js";
 import { runInteractiveMenu } from "./commands/menu.js";
 
 const program = new Command();
@@ -12,6 +14,8 @@ program
 
 registerCreateCommand(program);
 registerAddCommand(program);
+registerToolsCommand(program);
+registerConfigCommand(program);
 
 const hasArgs = process.argv.slice(2).length > 0;
 const isInteractive = process.stdin.isTTY === true && process.stdout.isTTY === true;
