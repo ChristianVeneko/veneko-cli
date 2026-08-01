@@ -3,7 +3,17 @@ dist/
 *.tgz
 .env
 .env.local
+
+# Local agent/tooling state, not part of the project
 .atl/
 .claude/
+
+# Planning notes; the README is the documentation that ships
+docs/
+
+# npm is the lockfile that the installer and CI use. Other package managers
+# are fine locally, but a second lockfile in the repo just drifts.
 pnpm-lock.yaml
 pnpm-workspace.yaml
+bun.lock
+bun.lockb

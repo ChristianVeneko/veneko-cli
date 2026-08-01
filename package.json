@@ -1,11 +1,38 @@
 {
   "name": "veneko-cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "CLI personal para andamiar proyectos y correr herramientas con IA desde la terminal",
   "type": "module",
+  "license": "MIT",
+  "author": "Christian Veneko",
+  "homepage": "https://github.com/ChristianVeneko/veneko-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChristianVeneko/veneko-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ChristianVeneko/veneko-cli/issues"
+  },
+  "keywords": [
+    "cli",
+    "scaffolding",
+    "generator",
+    "hexagonal-architecture",
+    "markitdown",
+    "yt-dlp"
+  ],
   "bin": {
     "veneko": "./dist/index.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "postbuild": "node -e \"const fs=require('fs');fs.cpSync('src/templates','dist/templates',{recursive:true})\"",
