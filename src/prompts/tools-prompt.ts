@@ -7,6 +7,12 @@ import { listOutputDestinations } from "../utils/user-dirs.js";
 import { getModelLabel } from "../config/providers.js";
 import { resolveToolModel } from "./model-prompt.js";
 import { convertPdfToMarkdown } from "../tools/pdf-to-markdown.js";
+import { convertDocumentToMarkdown } from "../tools/document-to-markdown.js";
+import {
+  detectMarkitdown,
+  MARKITDOWN_EXTENSIONS,
+  MARKITDOWN_INSTALL_HINT,
+} from "../tools/markitdown.js";
 
 const BACK = "__back__";
 
@@ -38,7 +44,7 @@ async function promptPdfPath(): Promise<string | null> {
   return pdfPath;
 }
 
-async function promptOutputPath(pdfPath: string): Promise<string | null> {
+async function promptOutputPath(sourcePath: string): Promise<string | null> {
   const destinations = await listOutputDestinations();
 
   const choice = await p.select({
@@ -55,7 +61,7 @@ async function promptOutputPath(pdfPath: string): Promise<string | null> {
   const destination = destinations.find((item) => item.value === choice);
   if (!destination) return null;
 
-  const fileName = `${basename(pdfPath, extname(pdfPath))}.md`;
+  const fileName = `${basename(sourcePath, extname(sourcePath))}.md`;
   const outputPath = join(destination.path, fileName);
 
   if (await fileExists(outputPath)) {
@@ -134,11 +140,137 @@ async function runPdfToMarkdownTool(): Promise<void> {
   }
 }
 
+async function promptDocumentPath(): Promise<string | null> {
+  const input = await p.text({
+    message: "Path to the document",
+    placeholder: "./report.docx",
+    validate: (value) => {
+      if (!value || value.trim().length === 0) return "A file path is required.";
+      return undefined;
+    },
+  });
+
+  if (p.isCancel(input)) return null;
+
+  const filePath = cleanPath(input);
+  if (!(await fileExists(filePath))) {
+    p.log.error(`${c.error("✖ File not found:")} ${pc.dim(filePath)}`);
+    return null;
+  }
+
+  const extension = extname(filePath).toLowerCase();
+  if (!MARKITDOWN_EXTENSIONS.includes(extension)) {
+    const proceed = await p.confirm({
+      message: `${extension || "This file"} is not a format veneko knows markitdown handles. Try anyway?`,
+      initialValue: false,
+    });
+    if (p.isCancel(proceed) || !proceed) return null;
+  }
+
+  return filePath;
+}
+
+async function runDocumentToMarkdownTool(): Promise<void> {
+  p.log.info(
+    `${c.dim("▸")} ${pc.bold("Document to Markdown")}\n` +
+    pc.dim("  Extracts the document with Microsoft markitdown, then has an AI clean up the result.\n") +
+    pc.dim("  Word, PowerPoint, Excel, EPUB, HTML, CSV, Outlook messages and text-layer PDFs.")
+  );
+
+  const markitdown = await detectMarkitdown();
+  if (!markitdown) {
+    p.log.error(`${c.error("✖")} ${MARKITDOWN_INSTALL_HINT}`);
+    return;
+  }
+
+  const filePath = await promptDocumentPath();
+  if (!filePath) return;
+
+  const outputPath = await promptOutputPath(filePath);
+  if (!outputPath) return;
+
+  const cleanup = await p.confirm({
+    message: "Clean up the extracted Markdown with AI?",
+    initialValue: true,
+  });
+  if (p.isCancel(cleanup)) return;
+
+  const resolved = cleanup ? await resolveToolModel() : null;
+  if (cleanup && !resolved) return;
+
+  p.note(
+    [
+      `${pc.bold("Source")}   ${pc.dim(filePath)}`,
+      `${pc.bold("Output")}   ${pc.dim(outputPath)}`,
+      `${pc.bold("Extract")}  ${pc.dim(markitdown.label)}`,
+      `${pc.bold("Format")}   ${
+        resolved
+          ? `${c.highlight(getModelLabel(resolved.provider, resolved.model))} ${pc.dim(`(${resolved.provider})`)}`
+          : pc.dim("skipped — raw markitdown output")
+      }`,
+      "",
+      pc.dim("markitdown takes about ten seconds to start up before it converts anything."),
+      pc.dim("Long documents are then formatted in fragments, one model request each."),
+    ].join("\n"),
+    pc.bold("▸ Conversion summary")
+  );
+
+  const proceed = await p.confirm({ message: "Start conversion?", initialValue: true });
+  if (p.isCancel(proceed) || !proceed) {
+    p.log.warn(`${c.warn("⚠")} Conversion cancelled.`);
+    return;
+  }
+
+  const s = p.spinner();
+  s.start(`${c.dim("▸")} Extracting with markitdown...`);
+
+  try {
+    const result = await convertDocumentToMarkdown({
+      filePath,
+      outputPath,
+      markitdownCommand: markitdown,
+      raw: !resolved,
+      provider: resolved?.provider ?? "openai",
+      model: resolved?.model ?? "",
+      apiKey: resolved?.apiKey ?? "",
+      onStage: (stage) => {
+        if (stage === "formatting") s.message(`${c.dim("▸")} Formatting with AI...`);
+        if (stage === "writing") s.message(`${c.dim("▸")} Writing Markdown...`);
+      },
+      onChunkDone: ({ completed, total }) => {
+        s.message(`${c.dim("▸")} Formatting with AI... ${c.highlight(`${completed}/${total}`)}`);
+      },
+    });
+
+    if (result.failedChunks.length > 0) {
+      s.stop(`${c.warn("⚠")} Finished with ${result.failedChunks.length} unformatted fragment(s).`);
+      p.log.warn(
+        `Fragments the model did not return: ${result.failedChunks.join(", ")}\n` +
+        pc.dim("  Their raw extracted text was kept, so no content was lost.")
+      );
+    } else if (result.formatted) {
+      s.stop(`${c.success("✔")} Formatted ${result.chunks} fragment(s).`);
+    } else {
+      s.stop(`${c.success("✔")} Extracted ${result.rawChars} characters.`);
+    }
+
+    p.log.success(`${c.success("✔")} Saved to ${c.highlight(result.outputPath)}`);
+  } catch (err) {
+    s.stop(`${c.error("✖")} Conversion failed.`);
+    p.log.error(err instanceof Error ? err.message : String(err));
+  }
+}
+
 export async function runToolsMenu(): Promise<void> {
   for (;;) {
     const choice = await p.select({
       message: "Tools",
       options: [
+        {
+          value: "document-to-markdown",
+          label: "Document to Markdown",
+          hint: "Word, Excel, PowerPoint, EPUB and more, via markitdown + AI cleanup",
+        },
         {
           value: "pdf-to-markdown",
           label: "Scanned PDF to Markdown",
@@ -149,6 +281,10 @@ export async function runToolsMenu(): Promise<void> {
     });
 
     if (p.isCancel(choice) || choice === BACK) return;
+
+    if (choice === "document-to-markdown") {
+      await runDocumentToMarkdownTool();
+    }
 
     if (choice === "pdf-to-markdown") {
       await runPdfToMarkdownTool();
