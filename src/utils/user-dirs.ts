@@ -15,39 +15,41 @@ interface DestinationCandidate {
   candidates: string[];
 }
 
-function userDirCandidates(): DestinationCandidate[] {
+/** OneDrive redirects these folders on many Windows installs. */
+function userDir(value: string, label: string, folder: string): DestinationCandidate {
   const home = homedir();
+  return {
+    value,
+    label,
+    candidates: [join(home, folder), join(home, "OneDrive", folder)],
+  };
+}
 
+function documentCandidates(): DestinationCandidate[] {
   return [
-    {
-      value: "desktop",
-      label: "Desktop",
-      // OneDrive redirects these folders on many Windows installs.
-      candidates: [join(home, "Desktop"), join(home, "OneDrive", "Desktop")],
-    },
-    {
-      value: "downloads",
-      label: "Downloads",
-      candidates: [join(home, "Downloads"), join(home, "OneDrive", "Downloads")],
-    },
-    {
-      value: "documents",
-      label: "Documents",
-      candidates: [join(home, "Documents"), join(home, "OneDrive", "Documents")],
-    },
+    userDir("desktop", "Desktop", "Desktop"),
+    userDir("downloads", "Downloads", "Downloads"),
+    userDir("documents", "Documents", "Documents"),
   ];
 }
 
-/**
- * Returns the folders a user can save tool output to: the current working
- * directory plus the standard user folders that actually exist on this machine.
- */
-export async function listOutputDestinations(): Promise<OutputDestination[]> {
+function mediaCandidates(): DestinationCandidate[] {
+  return [
+    userDir("downloads", "Downloads", "Downloads"),
+    userDir("videos", "Videos", "Videos"),
+    userDir("music", "Music", "Music"),
+    userDir("desktop", "Desktop", "Desktop"),
+  ];
+}
+
+async function resolveDestinations(
+  candidates: DestinationCandidate[]
+): Promise<OutputDestination[]> {
   const destinations: OutputDestination[] = [
     { value: "cwd", label: "Current folder", path: process.cwd() },
   ];
 
-  for (const candidate of userDirCandidates()) {
+  for (const candidate of candidates) {
     for (const path of candidate.candidates) {
       if (await fileExists(path)) {
         destinations.push({ value: candidate.value, label: candidate.label, path });
@@ -57,4 +59,17 @@ export async function listOutputDestinations(): Promise<OutputDestination[]> {
   }
 
   return destinations;
+}
+
+/**
+ * Returns the folders a user can save tool output to: the current working
+ * directory plus the standard user folders that actually exist on this machine.
+ */
+export function listOutputDestinations(): Promise<OutputDestination[]> {
+  return resolveDestinations(documentCandidates());
+}
+
+/** Same idea, ordered for downloads: Videos and Music instead of Documents. */
+export function listMediaDestinations(): Promise<OutputDestination[]> {
+  return resolveDestinations(mediaCandidates());
 }

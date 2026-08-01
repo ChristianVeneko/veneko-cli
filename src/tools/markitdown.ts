@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { mkdtemp, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { resolveOnPath } from "../utils/binaries.js";
 
 /**
  * markitdown is a Python package, not a Node one. veneko shells out to whatever
@@ -69,7 +70,6 @@ export const MARKITDOWN_EXTENSIONS = [
   ".mp4",
 ];
 
-const LOOKUP_TIMEOUT_MS = 10_000;
 /**
  * Generous on purpose: importing markitdown alone takes over ten seconds on a
  * cold Python process, before any conversion work starts.
@@ -123,35 +123,6 @@ function run(
       if (!settled) resolve({ code, stdout, stderr });
     });
   });
-}
-
-/**
- * Resolves an executable on PATH, or null when it is not there.
- *
- * Detection deliberately stops at "the binary exists" rather than running
- * `markitdown --version`: a cold Python import of markitdown takes over ten
- * seconds, which is far too long to spend before the first prompt. A wrong
- * guess costs a clear error at conversion time, not a stalled menu.
- */
-async function resolveOnPath(binary: string): Promise<string | null> {
-  const finder = process.platform === "win32" ? "where" : "which";
-
-  try {
-    const result = await run(finder, [binary], LOOKUP_TIMEOUT_MS);
-    if (result.code !== 0) return null;
-
-    return (
-      result.stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        // The Microsoft Store stub under WindowsApps is not a real interpreter:
-        // running it opens the Store and never returns.
-        .find((line) => !/[\\/]WindowsApps[\\/]/i.test(line)) ?? null
-    );
-  } catch {
-    return null;
-  }
 }
 
 let cached: MarkitdownCommand | null | undefined;
