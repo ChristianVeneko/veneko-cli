@@ -1,3 +1,4 @@
+import { getRunCommand } from "../utils/package-manager.js";
 import type { CreateConfig, TemplateManifest } from "../types/index.js";
 
 export function generateClaudeMd(
@@ -7,7 +8,7 @@ export function generateClaudeMd(
   const { projectName, packageManager, database } = config;
   const { displayName, architecture, scripts } = manifest;
 
-  const pmRun = packageManager === "bun" ? "bun run" : "pnpm run";
+  const pmRun = getRunCommand(packageManager);
 
   const architectureSection =
     architecture === "screaming"

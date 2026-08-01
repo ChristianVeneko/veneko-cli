@@ -1,5 +1,5 @@
 export type TemplateCategory = "frontend" | "backend";
-export type PackageManager = "bun" | "pnpm";
+export type PackageManager = "bun" | "pnpm" | "npm";
 export type DatabaseOption = "none" | "postgres" | "mysql" | "sqlite";
 export type FeatureName = "db-postgres" | "db-mysql" | "db-sqlite" | "auth" | "testing";
 

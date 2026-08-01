@@ -4,11 +4,12 @@ import pc from "picocolors";
 import { runCreatePrompt } from "../prompts/create-prompt.js";
 import { generateProject } from "../generators/project-generator.js";
 import { printBanner, c } from "../utils/logger.js";
+import { getRunCommand } from "../utils/package-manager.js";
 import type { CommandRunOptions, CreateConfig } from "../types/index.js";
 
 function buildOutroSummary(config: CreateConfig, templateLabel: string): string {
   const pm = config.packageManager;
-  const startCmd = pm === "bun" ? "bun run start:dev" : "pnpm run start:dev";
+  const startCmd = `${getRunCommand(pm)} start:dev`;
 
   return [
     `${pc.bold("Project")}    ${c.highlight(config.projectName)}`,

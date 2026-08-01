@@ -5,12 +5,39 @@ import pc from "picocolors";
 import { getTemplatesDir } from "../utils/paths.js";
 import { toKebabCase } from "../utils/name-utils.js";
 import { c } from "../utils/logger.js";
+import { isInstalled } from "../utils/package-manager.js";
 import type { CreateConfig, TemplateManifest, DatabaseOption, PackageManager } from "../types/index.js";
 
 interface TemplateOption {
   value: string;
   label: string;
   hint: string;
+}
+
+interface PackageManagerOption {
+  value: PackageManager;
+  label: string;
+  hint?: string;
+}
+
+/**
+ * Offers only the managers this machine can actually run. npm is always listed
+ * because it ships with Node — without it a box with neither Bun nor pnpm would
+ * be left with an empty prompt.
+ */
+async function packageManagerOptions(): Promise<PackageManagerOption[]> {
+  const candidates: PackageManagerOption[] = [
+    { value: "bun", label: "Bun", hint: "fastest" },
+    { value: "pnpm", label: "pnpm", hint: "disk-efficient" },
+  ];
+
+  const available: PackageManagerOption[] = [];
+  for (const candidate of candidates) {
+    if (await isInstalled(candidate.value)) available.push(candidate);
+  }
+
+  available.push({ value: "npm", label: "npm", hint: "ships with Node" });
+  return available;
 }
 
 async function discoverTemplates(): Promise<TemplateOption[]> {
@@ -125,10 +152,7 @@ export async function runCreatePrompt(): Promise<CreateConfig> {
 
   const packageManager = await p.select({
     message: "Package manager",
-    options: [
-      { value: "bun", label: "Bun", hint: "recommended" },
-      { value: "pnpm", label: "pnpm" },
-    ],
+    options: await packageManagerOptions(),
   });
   cancelIfNeeded(packageManager);
 
