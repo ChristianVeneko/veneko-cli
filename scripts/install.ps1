@@ -454,11 +454,19 @@ exit `$LASTEXITCODE
   # `veneko update` re-runs this installer, and without a record of where the
   # install actually went, a custom -Prefix or bin directory would be silently
   # replaced by the defaults on the next upgrade.
-  @{
+  # Written without a byte order mark: Set-Content -Encoding UTF8 adds one on
+  # Windows PowerShell, and JSON.parse rejects a leading ﻿.
+  $record = @{
     prefix = $Prefix
     binDir = $BinDir
     tag    = $script:ResolvedTag
-  } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Prefix 'install.json') -Encoding UTF8
+  } | ConvertTo-Json
+
+  [System.IO.File]::WriteAllText(
+    (Join-Path $Prefix 'install.json'),
+    $record,
+    (New-Object System.Text.UTF8Encoding $false)
+  )
 }
 
 # ---------------------------------------------------------------------------

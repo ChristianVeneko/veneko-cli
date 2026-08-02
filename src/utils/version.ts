@@ -43,13 +43,19 @@ export interface InstallRecord {
  * Without it an upgrade would re-run the installer with default paths, quietly
  * moving an install that used a custom prefix. Returns null for a source
  * checkout, which has no record and should not be upgraded in place anyway.
+ *
+ * The directory is a parameter so the failure modes can be tested; production
+ * callers let it default to the parent of this bundle.
  */
-export async function readInstallRecord(): Promise<InstallRecord | null> {
-  const prefix = dirname(getInstallRoot());
-
+export async function readInstallRecord(
+  prefix: string = dirname(getInstallRoot())
+): Promise<InstallRecord | null> {
   try {
     const raw = await readFile(join(prefix, "install.json"), "utf-8");
-    const parsed = JSON.parse(raw) as Partial<InstallRecord>;
+    // Windows PowerShell writes UTF-8 with a byte order mark, and JSON.parse
+    // rejects the leading ﻿ outright — which would silently discard the
+    // record on exactly the platform that wrote it.
+    const parsed = JSON.parse(raw.replace(/^﻿/, "")) as Partial<InstallRecord>;
     if (typeof parsed.prefix !== "string" || typeof parsed.binDir !== "string") return null;
 
     return { prefix: parsed.prefix, binDir: parsed.binDir, tag: parsed.tag };

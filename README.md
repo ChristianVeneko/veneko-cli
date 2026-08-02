@@ -179,7 +179,7 @@ El instalador se encarga de todo esto por vos. Y si algo queda faltando, `veneko
 Escribí `veneko` sin argumentos y se abre el menú interactivo:
 
 ```
-┌  veneko v1.0.2
+┌  veneko v1.0.3
 │
 ◆  What do you want to do?
 │  ● Create a new project    scaffold from a template
