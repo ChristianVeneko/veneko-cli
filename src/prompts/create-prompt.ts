@@ -90,7 +90,32 @@ function cancelIfNeeded(value: unknown): asserts value is NonNullable<typeof val
   }
 }
 
-export async function runCreatePrompt(): Promise<CreateConfig> {
+/**
+ * Asks for the project name, unless `veneko create <name>` already supplied
+ * one. An invalid name from the command line falls through to the prompt with
+ * the reason shown, rather than exiting — the user is right there to fix it.
+ */
+async function askProjectName(suggested?: string): Promise<string> {
+  if (suggested !== undefined) {
+    const problem = validateProjectName(suggested);
+    if (!problem) {
+      p.log.step(`Project name ${c.highlight(suggested)}`);
+      return suggested;
+    }
+    p.log.warn(`${problem} Pick another one.`);
+  }
+
+  const projectName = await p.text({
+    message: "Project name",
+    placeholder: "my-app",
+    validate: validateProjectName,
+  });
+  cancelIfNeeded(projectName);
+
+  return projectName as string;
+}
+
+export async function runCreatePrompt(suggestedName?: string): Promise<CreateConfig> {
   const templates = await discoverTemplates();
 
   if (templates.length === 0) {
@@ -101,14 +126,8 @@ export async function runCreatePrompt(): Promise<CreateConfig> {
     process.exit(1);
   }
 
-  const projectName = await p.text({
-    message: "Project name",
-    placeholder: "my-app",
-    validate: validateProjectName,
-  });
-  cancelIfNeeded(projectName);
-
-  const safeName = toKebabCase(projectName as string);
+  const projectName = await askProjectName(suggestedName);
+  const safeName = toKebabCase(projectName);
 
   const template = await p.select({
     message: "Select a template",

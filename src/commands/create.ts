@@ -23,13 +23,18 @@ function buildOutroSummary(config: CreateConfig, templateLabel: string): string 
   ].join("\n");
 }
 
-export async function runCreate(options: CommandRunOptions = {}): Promise<void> {
+export interface CreateRunOptions extends CommandRunOptions {
+  /** Name passed as `veneko create <name>`, skipping that prompt. */
+  projectName?: string;
+}
+
+export async function runCreate(options: CreateRunOptions = {}): Promise<void> {
   if (!options.fromMenu) {
     printBanner("scaffold a new project in seconds");
     p.intro(pc.bold(pc.cyan(" veneko create ")));
   }
 
-  const config = await runCreatePrompt();
+  const config = await runCreatePrompt(options.projectName);
   await generateProject(config);
 
   const templateLabel = config.template;
@@ -44,7 +49,7 @@ export function registerCreateCommand(program: Command): void {
   program
     .command("create [project-name]")
     .description("Scaffold a new project from a template")
-    .action(async () => {
-      await runCreate();
+    .action(async (projectName?: string) => {
+      await runCreate({ projectName });
     });
 }
