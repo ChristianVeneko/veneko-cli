@@ -133,12 +133,12 @@ irm https://raw.githubusercontent.com/ChristianVeneko/veneko-cli/main/scripts/in
 En cada [release](https://github.com/ChristianVeneko/veneko-cli/releases) GitHub adjunta el **Source code (zip)**. Si lo descargaste a mano:
 
 ```bash
-unzip veneko-cli-1.0.0.zip && cd veneko-cli-1.0.0
+unzip veneko-cli-*.zip && cd veneko-cli-*/
 bash scripts/install.sh          # macOS / Linux
 ```
 
 ```powershell
-Expand-Archive veneko-cli-1.0.0.zip -DestinationPath . ; cd veneko-cli-1.0.0
+Expand-Archive veneko-cli-*.zip -DestinationPath . ; cd veneko-cli-*
 .\scripts\install.ps1            # Windows
 ```
 
@@ -329,7 +329,7 @@ Te revisa todo y te da el comando exacto para lo que falte.
 | Síntoma | Qué pasa |
 |---------|----------|
 | `veneko: command not found` | La terminal todavía tiene el PATH viejo. Abrí una nueva, o corré `source ~/.zshrc`. |
-| El instalador dice que no encuentra el repositorio | GitHub limita las llamadas sin autenticar a 60 por hora **por IP**, y detrás de una red corporativa o un CI se agota rápido. Esperá unos minutos, definí `GITHUB_TOKEN` (el instalador lo usa si está), o saltate la consulta con `VENEKO_VERSION=v1.0.4`. |
+| El instalador dice que no encuentra el repositorio | GitHub limita las llamadas sin autenticar a 60 por hora **por IP**, y detrás de una red corporativa o un CI se agota rápido. Esperá unos minutos, definí `GITHUB_TOKEN` (el instalador lo usa si está), o saltate la consulta nombrando el release, por ejemplo `VENEKO_VERSION=v1.0.4`. |
 | `markitdown: not installed` | Instalalo con `pipx install 'markitdown[all]'`. Necesita Python 3.10+. |
 | El audio no se descarga | Falta ffmpeg. `brew install ffmpeg` en macOS, `winget install Gyan.FFmpeg` en Windows. |
 | yt-dlp falla en YouTube | YouTube cambió su reproductor. Actualizá con `pipx upgrade yt-dlp`. |
