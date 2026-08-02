@@ -17,7 +17,7 @@ REPO_NAME="veneko-cli"
 REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}"
 API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
 
-MIN_NODE_MAJOR=20
+MIN_NODE_MAJOR=22
 TOTAL_STEPS=9
 
 # ---------------------------------------------------------------------------
@@ -239,12 +239,10 @@ check_environment() {
       ;;
   esac
 
-  for tool in tar; do
-    if ! have "$tool"; then
-      fail "\`$tool\` is required but was not found."
-      exit 1
-    fi
-  done
+  if ! have tar; then
+    fail "\`tar\` is required but was not found."
+    exit 1
+  fi
 
   if ! have curl && ! have wget; then
     fail "Either curl or wget is required to download veneko."

@@ -8,9 +8,10 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  // Node 20 is the oldest release still receiving security fixes, and it is
-  // what the system package of most distros installs today.
-  target: "node20",
+  // Node 22, not 20: pdfjs-dist calls ArrayBuffer.prototype.transferToFixedLength,
+  // which landed in Node 21, so the scanned-PDF tool throws on anything older.
+  // Node 20 reached end of life in April 2026 anyway.
+  target: "node22",
   clean: true,
   splitting: false,
   // package.json is not shipped next to the bundle in every install layout, so

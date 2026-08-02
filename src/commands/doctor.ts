@@ -11,8 +11,11 @@ import { fileExists } from "../utils/fs.js";
 import { c, printBanner } from "../utils/logger.js";
 import type { CommandRunOptions } from "../types/index.js";
 
-/** Oldest Node that this build targets. */
-const MIN_NODE_MAJOR = 20;
+/**
+ * Oldest Node that this build targets. pdfjs-dist needs an ArrayBuffer method
+ * that only exists from Node 21 on, and Node 20 is end of life regardless.
+ */
+const MIN_NODE_MAJOR = 22;
 /** markitdown needs 3.10; yt-dlp needs 3.9. The stricter one wins. */
 const MIN_PYTHON = [3, 10] as const;
 

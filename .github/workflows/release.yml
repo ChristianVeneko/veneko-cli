@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - run: npm ci --no-audit --no-fund
@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - name: Resolve the tag
@@ -106,6 +106,6 @@ jobs:
             Si ya tenés veneko instalado, actualizá con `veneko update`.
 
             El instalador toma el **Source code (zip)** de abajo, lo compila y
-            deja `veneko` en tu PATH. Requiere Node.js 20 o superior.
+            deja `veneko` en tu PATH. Requiere Node.js 22 o superior.
 
             ---

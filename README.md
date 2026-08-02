@@ -12,7 +12,7 @@
 **Andamiá proyectos con arquitectura hexagonal y corré herramientas con IA, todo desde la terminal.**
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
-[![Node 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+[![Node 22+](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org)
 [![macOS · Linux · Windows](https://img.shields.io/badge/plataformas-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-lightgrey.svg)](#instalación)
 
 </div>
@@ -33,7 +33,7 @@ Todo se maneja desde un menú interactivo. Si preferís comandos directos, tambi
 ## Instalación
 
 > [!NOTE]
-> veneko necesita **Node.js 20 o superior** en cualquier plataforma. El instalador lo verifica y te dice cómo instalarlo si falta. Mirá [Requisitos](#requisitos) antes de arrancar.
+> veneko necesita **Node.js 22 o superior** en cualquier plataforma. El instalador lo verifica y te dice cómo instalarlo si falta. Mirá [Requisitos](#requisitos) antes de arrancar.
 
 ### macOS y Linux
 
@@ -55,7 +55,7 @@ No es una caja negra. Estos son los nueve pasos que vas a ver en pantalla:
 
 | # | Paso | Qué hace |
 |---|------|----------|
-| 1 | Verifica la máquina | Sistema operativo, Node.js 20+, npm. Si algo falta, corta ahí y te da el comando exacto para tu sistema. |
+| 1 | Verifica la máquina | Sistema operativo, Node.js 22+, npm. Si algo falta, corta ahí y te da el comando exacto para tu sistema. |
 | 2 | Resuelve la versión | Consulta el último release publicado en GitHub. Si todavía no hay ninguno, usa la rama por defecto. |
 | 3 | Descarga | Baja el código fuente del release y lo extrae en una carpeta temporal. |
 | 4 | Instala dependencias JS | `npm ci` con el lockfile del repo, así la instalación es reproducible. |
@@ -146,7 +146,7 @@ Expand-Archive veneko-cli-1.0.0.zip -DestinationPath . ; cd veneko-cli-1.0.0
 
 ### Obligatorio
 
-**Node.js 20 o superior** y **npm** (viene con Node).
+**Node.js 22 o superior** y **npm** (viene con Node).
 
 | Sistema | Cómo instalarlo |
 |---------|-----------------|
@@ -155,6 +155,11 @@ Expand-Archive veneko-cli-1.0.0.zip -DestinationPath . ; cd veneko-cli-1.0.0
 | Fedora | `sudo dnf install nodejs` |
 | Arch | `sudo pacman -S nodejs npm` |
 | Windows | `winget install OpenJS.NodeJS.LTS` |
+
+> [!WARNING]
+> El paquete `nodejs` de Debian y Ubuntu suele venir varias versiones atrás. Si `node -v` te da menos de 22, usá [nvm](https://github.com/nvm-sh/nvm) o el repositorio de [NodeSource](https://github.com/nodesource/distributions).
+
+¿Por qué 22 y no 20? La herramienta de PDFs escaneados usa `pdfjs-dist`, que necesita una API de `ArrayBuffer` que recién apareció en Node 21. Y Node 20 llegó a fin de vida en abril de 2026.
 
 ### Opcional, según qué herramienta uses
 

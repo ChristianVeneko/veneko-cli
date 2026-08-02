@@ -51,7 +51,7 @@ $RepoOwner = 'ChristianVeneko'
 $RepoName = 'veneko-cli'
 $RepoUrl = "https://github.com/$RepoOwner/$RepoName"
 $ApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
-$MinNodeMajor = 20
+$MinNodeMajor = 22
 $TotalSteps = 9
 
 # `irm … | iex` cannot pass parameters, and that is the documented way to
