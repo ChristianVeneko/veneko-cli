@@ -100,7 +100,31 @@ bash install.sh --help
 
 En Windows son las mismas con sintaxis de PowerShell: `-Yes`, `-Release`, `-Prefix`, `-NoPython`, `-NoFfmpeg`, `-NoPath`, `-ShowOutput`.
 
-También podés usar variables de entorno: `VENEKO_HOME`, `VENEKO_BIN_DIR`, `VENEKO_VERSION`, `VENEKO_YES`.
+#### Con el one-liner
+
+Un comando con pipe no puede recibir flags, así que **cada opción también se lee del entorno**:
+
+| Variable | Equivale a |
+|----------|-----------|
+| `VENEKO_HOME` | `--prefix` |
+| `VENEKO_BIN_DIR` | `--bin-dir` |
+| `VENEKO_VERSION` | `--version` |
+| `VENEKO_YES=1` | `--yes` |
+| `VENEKO_NO_PYTHON=1` | `--no-python` |
+| `VENEKO_NO_FFMPEG=1` | `--no-ffmpeg` |
+| `VENEKO_NO_PATH=1` | `--no-path` |
+| `VENEKO_VERBOSE=1` | `--verbose` |
+
+```bash
+# macOS / Linux — instalar sin tocar Python
+curl -fsSL https://raw.githubusercontent.com/ChristianVeneko/veneko-cli/main/scripts/install.sh | VENEKO_NO_PYTHON=1 bash
+```
+
+```powershell
+# Windows — lo mismo
+$env:VENEKO_NO_PYTHON = '1'
+irm https://raw.githubusercontent.com/ChristianVeneko/veneko-cli/main/scripts/install.ps1 | iex
+```
 
 ### Instalar desde el ZIP del release
 

@@ -24,14 +24,17 @@ TOTAL_STEPS=9
 # Options
 # ---------------------------------------------------------------------------
 
+# Every flag below is also readable from the environment. `curl … | bash`
+# cannot pass arguments, and that is the documented way to install, so an
+# option that only exists as a flag is an option most people cannot reach.
 VENEKO_HOME="${VENEKO_HOME:-$HOME/.veneko}"
 BIN_DIR="${VENEKO_BIN_DIR:-$HOME/.local/bin}"
 REQUESTED_VERSION="${VENEKO_VERSION:-}"
 ASSUME_YES="${VENEKO_YES:-0}"
-WITH_PYTHON=1
-WITH_FFMPEG=1
-UPDATE_PATH=1
-VERBOSE=0
+WITH_PYTHON=$([ "${VENEKO_NO_PYTHON:-0}" = "1" ] && echo 0 || echo 1)
+WITH_FFMPEG=$([ "${VENEKO_NO_FFMPEG:-0}" = "1" ] && echo 0 || echo 1)
+UPDATE_PATH=$([ "${VENEKO_NO_PATH:-0}" = "1" ] && echo 0 || echo 1)
+VERBOSE="${VENEKO_VERBOSE:-0}"
 
 usage() {
   cat <<EOF
@@ -50,7 +53,19 @@ Options:
       --verbose        Show the full output of every command
   -h, --help           Show this message
 
-Environment variables: VENEKO_HOME, VENEKO_BIN_DIR, VENEKO_VERSION, VENEKO_YES
+Every option is also readable from the environment, which is how you set them
+when installing through a pipe:
+
+  VENEKO_HOME        same as --prefix
+  VENEKO_BIN_DIR     same as --bin-dir
+  VENEKO_VERSION     same as --version
+  VENEKO_YES=1       same as --yes
+  VENEKO_NO_PYTHON=1 same as --no-python
+  VENEKO_NO_FFMPEG=1 same as --no-ffmpeg
+  VENEKO_NO_PATH=1   same as --no-path
+  VENEKO_VERBOSE=1   same as --verbose
+
+  curl -fsSL .../install.sh | VENEKO_NO_PYTHON=1 bash
 EOF
 }
 

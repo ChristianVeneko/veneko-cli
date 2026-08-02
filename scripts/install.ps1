@@ -12,6 +12,14 @@
 
 .EXAMPLE
   .\install.ps1 -Yes -NoFfmpeg
+
+.NOTES
+  A piped install cannot receive parameters, so every switch is also read from
+  the environment: VENEKO_HOME, VENEKO_BIN_DIR, VENEKO_VERSION, VENEKO_YES,
+  VENEKO_NO_PYTHON, VENEKO_NO_FFMPEG, VENEKO_NO_PATH, VENEKO_VERBOSE.
+
+      $env:VENEKO_NO_PYTHON = '1'
+      irm .../install.ps1 | iex
 #>
 
 [CmdletBinding()]
@@ -46,7 +54,13 @@ $ApiUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
 $MinNodeMajor = 20
 $TotalSteps = 9
 
+# `irm … | iex` cannot pass parameters, and that is the documented way to
+# install, so every switch is also readable from the environment.
 if ($env:VENEKO_YES -eq '1') { $Yes = $true }
+if ($env:VENEKO_NO_PYTHON -eq '1') { $NoPython = $true }
+if ($env:VENEKO_NO_FFMPEG -eq '1') { $NoFfmpeg = $true }
+if ($env:VENEKO_NO_PATH -eq '1') { $NoPath = $true }
+if ($env:VENEKO_VERBOSE -eq '1') { $ShowOutput = $true }
 
 $AppDir = Join-Path $Prefix 'app'
 $StageDir = Join-Path $Prefix '.stage'
@@ -479,21 +493,34 @@ function Find-Python {
   foreach ($candidate in @('py', 'python3', 'python')) {
     if (-not (Test-Command $candidate)) { continue }
 
-    $source = (Get-Command $candidate).Source
+    $source = (Get-Command $candidate | Select-Object -First 1).Source
     if ($source -and $source -match '\\WindowsApps\\') { continue }
 
     try {
+      # The snippet deliberately contains no quotes. Windows PowerShell rebuilds
+      # the command line for a native process and drops embedded double quotes,
+      # so `print("%d.%d" % ...)` reaches Python as a syntax error. Encoding the
+      # version as one integer - 3.13 becomes 313 - sidesteps quoting entirely
+      # and makes the comparison a single number.
       # `$args` is an automatic variable in PowerShell, so it cannot be reused here.
-      $probe = @('-c', 'import sys; print("%d.%d" % sys.version_info[:2])')
+      $probe = @('-c', 'import sys; print(sys.version_info[0]*100 + sys.version_info[1])')
       if ($candidate -eq 'py') { $probe = @('-3') + $probe }
-      $version = (& $candidate @probe 2>$null | Select-Object -First 1)
-      if (-not $version) { continue }
 
-      $parts = $version.Trim().Split('.')
-      $major = [int]$parts[0]
-      $minor = [int]$parts[1]
-      if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 10)) {
-        return @{ Command = $candidate; Version = $version.Trim(); BaseArgs = $(if ($candidate -eq 'py') { @('-3') } else { @() }) }
+      $encoded = (& $candidate @probe 2>$null | Select-Object -First 1)
+      if (-not $encoded) { continue }
+
+      $number = 0
+      if (-not [int]::TryParse($encoded.Trim(), [ref] $number)) { continue }
+
+      # 310 is Python 3.10, the floor markitdown needs.
+      if ($number -ge 310) {
+        $major = [math]::Floor($number / 100)
+        $minor = $number % 100
+        return @{
+          Command  = $candidate
+          Version  = "$major.$minor"
+          BaseArgs = $(if ($candidate -eq 'py') { @('-3') } else { @() })
+        }
       }
     } catch {
       continue
