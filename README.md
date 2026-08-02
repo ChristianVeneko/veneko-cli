@@ -271,7 +271,7 @@ Cuando algo falla, el error te dice **qué hacer**: si el video es privado, si n
 |-----------|---------------------|
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
-| Google | `GOOGLE_API_KEY` |
+| Google (Gemini) | `GEMINI_API_KEY` |
 | xAI | `XAI_API_KEY` |
 
 Las keys se guardan en `~/.veneko/config.json` con permisos `0600` (solo tu usuario puede leerlo). Si preferís no guardarlas en disco, definí la variable de entorno correspondiente: veneko la usa igual.
