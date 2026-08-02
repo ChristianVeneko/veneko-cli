@@ -46,16 +46,25 @@ Remove-Target (Join-Path $Prefix '.previous')
 Remove-Target (Join-Path $BinDir 'veneko.cmd')
 Remove-Target (Join-Path $BinDir 'veneko.ps1')
 
-# Take the launcher folder back out of the user PATH.
+# Take the launcher folder back out of the user PATH - but only when it is
+# actually there. Rewriting someone's PATH as a side effect of a no-op is how
+# an uninstaller earns a reputation it cannot shake.
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if ($userPath) {
-  $entries = $userPath.Split(';') | Where-Object { $_ -ne '' -and $_ -ne $BinDir }
-  $newPath = $entries -join ';'
-  if ($newPath -ne $userPath) {
-    [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+  $entries = $userPath.Split(';')
+  if ($entries -contains $BinDir) {
+    $kept = $entries | Where-Object { $_ -ne '' -and $_ -ne $BinDir }
+    [Environment]::SetEnvironmentVariable('Path', ($kept -join ';'), 'User')
     Write-Host '  + ' -ForegroundColor Green -NoNewline
     Write-Host "removed $BinDir from your user PATH"
     $removed++
+  }
+}
+
+# An empty bin/ left behind is just litter.
+foreach ($dir in @($BinDir, $Prefix)) {
+  if ((Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -LiteralPath $dir -Force)) {
+    Remove-Item -LiteralPath $dir -Force
   }
 }
 

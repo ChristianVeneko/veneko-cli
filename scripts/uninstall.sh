@@ -64,6 +64,10 @@ if [ "$PURGE" -eq 1 ]; then
 elif [ -f "$VENEKO_HOME/config.json" ]; then
   printf '  %s○%s kept %s %s(use --purge to delete it)%s\n' \
     "$YELLOW" "$RESET" "$VENEKO_HOME/config.json" "$DIM" "$RESET"
+else
+  # An empty ~/.veneko left behind is just litter. $BIN_DIR is deliberately
+  # left alone: other tools live there too.
+  rmdir "$VENEKO_HOME" 2>/dev/null || true
 fi
 
 if [ "$removed" -eq 0 ]; then
