@@ -77,3 +77,53 @@ jobs:
             }
             Write-Host "$file parses cleanly"
           }
+
+  # Parsing a script proves nothing about whether it installs anything. This
+  # runs the real installer on real machines, then checks the CLI it produced
+  # actually starts and that uninstalling leaves nothing behind.
+  install-smoke:
+    name: Install for real on ${{ matrix.os }}
+    # Only after a push lands, since the installer downloads the default branch
+    # rather than the working tree.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the installer
+        env:
+          VENEKO_HOME: ${{ runner.temp }}/veneko
+          VENEKO_BIN_DIR: ${{ runner.temp }}/veneko/bin
+          VENEKO_YES: '1'
+          VENEKO_NO_PYTHON: '1'
+          VENEKO_NO_FFMPEG: '1'
+          VENEKO_NO_PATH: '1'
+        run: bash scripts/install.sh
+
+      - name: The installed CLI must run
+        run: |
+          LAUNCHER="${{ runner.temp }}/veneko/bin/veneko"
+          test -x "$LAUNCHER" || (echo "launcher is not executable" && exit 1)
+          "$LAUNCHER" --version
+          "$LAUNCHER" doctor --offline || true
+
+      - name: The templates must have been bundled
+        run: test -d "${{ runner.temp }}/veneko/app/dist/templates/nextjs"
+
+      - name: Uninstalling must leave nothing behind
+        env:
+          VENEKO_HOME: ${{ runner.temp }}/veneko
+          VENEKO_BIN_DIR: ${{ runner.temp }}/veneko/bin
+        run: |
+          bash scripts/uninstall.sh --purge
+          test ! -e "${{ runner.temp }}/veneko/app" || (echo "app survived the uninstall" && exit 1)
+          test ! -e "${{ runner.temp }}/veneko/bin/veneko" || (echo "launcher survived the uninstall" && exit 1)
