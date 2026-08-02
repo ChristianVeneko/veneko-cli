@@ -43,6 +43,7 @@ Write-Host ''
 Remove-Target (Join-Path $Prefix 'app')
 Remove-Target (Join-Path $Prefix '.stage')
 Remove-Target (Join-Path $Prefix '.previous')
+Remove-Target (Join-Path $Prefix 'install.json')
 Remove-Target (Join-Path $BinDir 'veneko.cmd')
 Remove-Target (Join-Path $BinDir 'veneko.ps1')
 

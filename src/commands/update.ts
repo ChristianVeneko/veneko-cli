@@ -7,10 +7,12 @@ import {
   compareVersions,
   getInstallerPath,
   getInstallRoot,
+  readInstallRecord,
   REPO_OWNER,
   REPO_NAME,
   REPO_URL,
   VERSION,
+  type InstallRecord,
 } from "../utils/version.js";
 import { resolveOnPath } from "../utils/binaries.js";
 import { fileExists } from "../utils/fs.js";
@@ -51,14 +53,20 @@ async function installerRunner(scriptPath: string, assumeYes: boolean): Promise<
   return { command: "bash", args };
 }
 
-function runInstaller(runner: Runner): Promise<number> {
+function runInstaller(runner: Runner, record: InstallRecord | null): Promise<number> {
   return new Promise((resolve, reject) => {
+    // The installer defaults to the standard locations, so an install that used
+    // a custom prefix has to be told where it lives or the upgrade would land
+    // somewhere else and leave the old copy behind.
+    const env: NodeJS.ProcessEnv = { ...process.env, VENEKO_UPDATED_FROM: VERSION };
+    if (record) {
+      env.VENEKO_HOME = record.prefix;
+      env.VENEKO_BIN_DIR = record.binDir;
+    }
+
     // stdio is inherited on purpose: the installer prints its own progress, and
     // buffering it would leave the user staring at a frozen spinner for minutes.
-    const child = spawn(runner.command, runner.args, {
-      stdio: "inherit",
-      env: { ...process.env, VENEKO_UPDATED_FROM: VERSION },
-    });
+    const child = spawn(runner.command, runner.args, { stdio: "inherit", env });
 
     child.on("error", reject);
     child.on("close", (code) => resolve(code ?? 1));
@@ -165,7 +173,7 @@ export async function runUpdate(options: UpdateOptions = {}): Promise<void> {
 
   let code: number;
   try {
-    code = await runInstaller(runner);
+    code = await runInstaller(runner, await readInstallRecord());
   } catch (err) {
     p.log.error(`The installer could not be started: ${err instanceof Error ? err.message : String(err)}`);
     p.note(manualInstallCommand(), pc.bold("Install manually with"));

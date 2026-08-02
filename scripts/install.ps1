@@ -450,6 +450,15 @@ exit `$LASTEXITCODE
 "@ | Set-Content -LiteralPath (Join-Path $BinDir 'veneko.ps1') -Encoding UTF8
 
   Write-Ok "Launcher written to $BinDir\veneko.cmd"
+
+  # `veneko update` re-runs this installer, and without a record of where the
+  # install actually went, a custom -Prefix or bin directory would be silently
+  # replaced by the defaults on the next upgrade.
+  @{
+    prefix = $Prefix
+    binDir = $BinDir
+    tag    = $script:ResolvedTag
+  } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Prefix 'install.json') -Encoding UTF8
 }
 
 # ---------------------------------------------------------------------------

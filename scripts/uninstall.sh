@@ -57,6 +57,7 @@ printf '\n%sUninstalling veneko-cli%s\n\n' "$BOLD" "$RESET"
 remove_path "$VENEKO_HOME/app"
 remove_path "$VENEKO_HOME/.stage"
 remove_path "$VENEKO_HOME/.previous"
+remove_path "$VENEKO_HOME/install.json"
 remove_path "$BIN_DIR/veneko"
 
 if [ "$PURGE" -eq 1 ]; then

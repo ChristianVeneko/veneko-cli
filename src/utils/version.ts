@@ -1,3 +1,4 @@
+import { readFile } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -27,6 +28,34 @@ export function getInstallRoot(): string {
 export function getInstallerPath(): string {
   const script = process.platform === "win32" ? "install.ps1" : "install.sh";
   return join(getInstallRoot(), "scripts", script);
+}
+
+/** Where the installer put things, as it recorded at install time. */
+export interface InstallRecord {
+  prefix: string;
+  binDir: string;
+  tag?: string;
+}
+
+/**
+ * Reads the record the installer leaves beside the app.
+ *
+ * Without it an upgrade would re-run the installer with default paths, quietly
+ * moving an install that used a custom prefix. Returns null for a source
+ * checkout, which has no record and should not be upgraded in place anyway.
+ */
+export async function readInstallRecord(): Promise<InstallRecord | null> {
+  const prefix = dirname(getInstallRoot());
+
+  try {
+    const raw = await readFile(join(prefix, "install.json"), "utf-8");
+    const parsed = JSON.parse(raw) as Partial<InstallRecord>;
+    if (typeof parsed.prefix !== "string" || typeof parsed.binDir !== "string") return null;
+
+    return { prefix: parsed.prefix, binDir: parsed.binDir, tag: parsed.tag };
+  } catch {
+    return null;
+  }
 }
 
 /**

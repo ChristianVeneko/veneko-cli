@@ -459,6 +459,17 @@ EOF
 
   chmod +x "$BIN_DIR/veneko"
   ok "Launcher written to $BIN_DIR/veneko"
+
+  # `veneko update` re-runs this installer, and without a record of where the
+  # install actually went, a custom --prefix or --bin-dir would be silently
+  # replaced by the defaults on the next upgrade.
+  cat > "$VENEKO_HOME/install.json" <<EOF
+{
+  "prefix": "$VENEKO_HOME",
+  "binDir": "$BIN_DIR",
+  "tag": "$RESOLVED_TAG"
+}
+EOF
 }
 
 # ---------------------------------------------------------------------------
