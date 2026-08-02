@@ -286,11 +286,37 @@ check_environment() {
 # 2. Which version
 # ---------------------------------------------------------------------------
 
+# Unauthenticated GitHub API calls are capped at 60 per hour per IP address,
+# which a shared corporate NAT or a CI runner burns through quickly. A token is
+# never required, but honouring one when it is already in the environment costs
+# nothing and turns a hard failure into a normal install.
+# The explicit `return 0` is load-bearing: a bare `[ … ] && printf` exits
+# non-zero when there is no token, and under `set -e` that aborts the whole
+# install through the command substitution that calls it.
+github_auth_header() {
+  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  if [ -n "$token" ]; then
+    printf 'Authorization: Bearer %s' "$token"
+  fi
+  return 0
+}
+
 fetch_url() {
+  local auth
+  auth="$(github_auth_header)"
+
   if have curl; then
-    curl -fsSL "$1"
+    if [ -n "$auth" ]; then
+      curl -fsSL -H "$auth" "$1"
+    else
+      curl -fsSL "$1"
+    fi
   else
-    wget -qO- "$1"
+    if [ -n "$auth" ]; then
+      wget -qO- --header="$auth" "$1"
+    else
+      wget -qO- "$1"
+    fi
   fi
 }
 
@@ -344,9 +370,13 @@ resolve_version() {
     printf '  The most likely reasons are:\n\n' >&2
     printf '    • the repository is private — a public repository is required for\n' >&2
     printf '      this installer, since it downloads without any credentials\n' >&2
-    printf '    • GitHub rate-limited this IP address (try again in a few minutes)\n' >&2
+    printf '    • GitHub rate-limited this IP address — unauthenticated calls are\n' >&2
+    printf '      capped at 60 per hour. Wait a few minutes, or set GITHUB_TOKEN\n' >&2
+    printf '      and run this again.\n' >&2
     printf '    • you are offline\n\n' >&2
-    printf '  Check it here: %s\n\n' "$REPO_URL" >&2
+    printf '  You can also skip the lookup entirely by naming the release:\n' >&2
+    printf '    VENEKO_VERSION=v1.0.0 %s\n\n' "$0" >&2
+    printf '  Check the repository here: %s\n\n' "$REPO_URL" >&2
     exit 1
   fi
 

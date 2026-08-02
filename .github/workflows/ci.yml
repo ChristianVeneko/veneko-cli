@@ -107,6 +107,10 @@ jobs:
           VENEKO_NO_PYTHON: '1'
           VENEKO_NO_FFMPEG: '1'
           VENEKO_NO_PATH: '1'
+          # Runners share outbound addresses, so the 60-per-hour cap on
+          # unauthenticated GitHub API calls is reached routinely - macOS
+          # especially. The installer uses this only when it is present.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/install.sh
 
       - name: The installed CLI must run

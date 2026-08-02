@@ -266,6 +266,13 @@ function Resolve-Release {
     'User-Agent' = "$RepoName-installer"
   }
 
+  # Unauthenticated GitHub API calls are capped at 60 per hour per IP address,
+  # which a shared corporate NAT or a CI runner burns through quickly. A token
+  # is never required, but honouring one already in the environment costs
+  # nothing and turns a hard failure into a normal install.
+  $token = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } elseif ($env:GH_TOKEN) { $env:GH_TOKEN } else { $null }
+  if ($token) { $headers['Authorization'] = "Bearer $token" }
+
   try {
     $payload = Invoke-RestMethod -Uri $ApiUrl -Headers $headers -TimeoutSec 20
     if ($payload.tag_name) {
@@ -297,10 +304,15 @@ GitHub does not return anything for $RepoOwner/$RepoName.
 
     - the repository is private; a public repository is required for this
       installer, since it downloads without any credentials
-    - GitHub rate-limited this IP address (try again in a few minutes)
+    - GitHub rate-limited this IP address - unauthenticated calls are capped
+      at 60 per hour. Wait a few minutes, or set `$env:GITHUB_TOKEN and run
+      this again.
     - you are offline
 
-  Check it here: $RepoUrl
+  You can also skip the lookup entirely by naming the release:
+    `$env:VENEKO_VERSION = 'v1.0.0'
+
+  Check the repository here: $RepoUrl
 "@
   }
 
