@@ -115,6 +115,8 @@ Un comando con pipe no puede recibir flags, así que **cada opción también se 
 | `VENEKO_NO_PATH=1` | `--no-path` |
 | `VENEKO_VERBOSE=1` | `--verbose` |
 
+Además, si `GITHUB_TOKEN` o `GH_TOKEN` ya están en tu entorno, el instalador los usa para consultar la API. No hace falta ninguno: sirve solamente para no chocar con el límite de 60 llamadas por hora que GitHub aplica por IP.
+
 ```bash
 # macOS / Linux — instalar sin tocar Python
 curl -fsSL https://raw.githubusercontent.com/ChristianVeneko/veneko-cli/main/scripts/install.sh | VENEKO_NO_PYTHON=1 bash
@@ -327,7 +329,7 @@ Te revisa todo y te da el comando exacto para lo que falte.
 | Síntoma | Qué pasa |
 |---------|----------|
 | `veneko: command not found` | La terminal todavía tiene el PATH viejo. Abrí una nueva, o corré `source ~/.zshrc`. |
-| El instalador dice que no encuentra el repositorio | GitHub limitó tu IP por cantidad de pedidos. Esperá unos minutos. |
+| El instalador dice que no encuentra el repositorio | GitHub limita las llamadas sin autenticar a 60 por hora **por IP**, y detrás de una red corporativa o un CI se agota rápido. Esperá unos minutos, definí `GITHUB_TOKEN` (el instalador lo usa si está), o saltate la consulta con `VENEKO_VERSION=v1.0.4`. |
 | `markitdown: not installed` | Instalalo con `pipx install 'markitdown[all]'`. Necesita Python 3.10+. |
 | El audio no se descarga | Falta ffmpeg. `brew install ffmpeg` en macOS, `winget install Gyan.FFmpeg` en Windows. |
 | yt-dlp falla en YouTube | YouTube cambió su reproductor. Actualizá con `pipx upgrade yt-dlp`. |
