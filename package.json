@@ -1,6 +1,6 @@
 {
   "name": "veneko-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI personal para andamiar proyectos y correr herramientas con IA desde la terminal",
   "type": "module",
   "license": "MIT",

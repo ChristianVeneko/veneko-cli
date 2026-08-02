@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { dirname } from "path";
 import type { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
@@ -55,14 +56,27 @@ async function installerRunner(scriptPath: string, assumeYes: boolean): Promise<
 
 function runInstaller(runner: Runner, record: InstallRecord | null): Promise<number> {
   return new Promise((resolve, reject) => {
-    // The installer defaults to the standard locations, so an install that used
-    // a custom prefix has to be told where it lives or the upgrade would land
-    // somewhere else and leave the old copy behind.
-    const env: NodeJS.ProcessEnv = { ...process.env, VENEKO_UPDATED_FROM: VERSION };
-    if (record) {
-      env.VENEKO_HOME = record.prefix;
-      env.VENEKO_BIN_DIR = record.binDir;
-    }
+    // The installer defaults to the standard locations, so an install that
+    // lives anywhere else has to be told, or the upgrade lands in the default
+    // path and leaves the running copy behind, unupgraded.
+    //
+    // The prefix is derived from where this bundle actually sits rather than
+    // taken from the record, so it is right even for a version installed before
+    // the record existed. The record only adds the launcher directory, which
+    // nothing else can reveal.
+    //
+    // The optional tools are left out of an upgrade on purpose: they were
+    // decided once, at install time, and re-running that here would install
+    // pipx and its packages on a machine whose owner only asked for a newer
+    // veneko.
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      VENEKO_UPDATED_FROM: VERSION,
+      VENEKO_HOME: record?.prefix ?? dirname(getInstallRoot()),
+      VENEKO_NO_PYTHON: "1",
+      VENEKO_NO_FFMPEG: "1",
+    };
+    if (record) env.VENEKO_BIN_DIR = record.binDir;
 
     // stdio is inherited on purpose: the installer prints its own progress, and
     // buffering it would leave the user staring at a frozen spinner for minutes.
