@@ -7,7 +7,10 @@ import { listMediaDestinations, listOutputDestinations } from "../utils/user-dir
 import { getModelLabel } from "../config/providers.js";
 import { resolveToolModel } from "./model-prompt.js";
 import { convertPdfToMarkdown } from "../tools/pdf-to-markdown.js";
-import { convertDocumentToMarkdown } from "../tools/document-to-markdown.js";
+import {
+  convertDocumentToMarkdown,
+  type DocumentToMarkdownResult,
+} from "../tools/document-to-markdown.js";
 import {
   detectMarkitdown,
   MARKITDOWN_EXTENSIONS,
@@ -185,11 +188,53 @@ async function promptDocumentPath(): Promise<string | null> {
   return filePath;
 }
 
+/** Reports what happened to the figures, including anything that was dropped. */
+function reportFigures(result: DocumentToMarkdownResult): void {
+  if (result.figuresFound === 0) {
+    p.log.info(`${c.dim("▸")} No images found in the PDF — only its text layer was converted.`);
+    return;
+  }
+
+  p.log.success(
+    `${c.success("✔")} Converted ${result.figuresDescribed} of ${result.figuresFound} figure(s).`
+  );
+
+  if (result.figuresRejected > 0) {
+    p.log.info(
+      `${c.dim("▸")} ${result.figuresRejected} region(s) turned out not to be figures.\n` +
+      pc.dim("  Table borders, rules and frames look like drawings, so the model checks each\n") +
+      pc.dim("  one and these were discarded. They leave no trace in the Markdown.")
+    );
+  }
+
+  if (result.failedFigures.length > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} Figures the model could not read: ${result.failedFigures.join(", ")}\n` +
+      pc.dim("  Each one is marked in the Markdown with an HTML comment so you can retry it.")
+    );
+  }
+
+  if (result.figuresAppended > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} ${result.figuresAppended} figure(s) could not be placed in the text.\n` +
+      pc.dim('  They are collected under "Figures without a detected position" at the end.')
+    );
+  }
+
+  if (result.figuresSkipped > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} ${result.figuresSkipped} image region(s) were skipped by the per-page limit.\n` +
+      pc.dim("  Pages crowded with images keep only the largest ones.")
+    );
+  }
+}
+
 async function runDocumentToMarkdownTool(): Promise<void> {
   p.log.info(
     `${c.dim("▸")} ${pc.bold("Document to Markdown")}\n` +
     pc.dim("  Extracts the document with Microsoft markitdown, then has an AI clean up the result.\n") +
-    pc.dim("  Word, PowerPoint, Excel, EPUB, HTML, CSV, Outlook messages and text-layer PDFs.")
+    pc.dim("  Word, PowerPoint, Excel, EPUB, HTML, CSV, Outlook messages and text-layer PDFs.\n") +
+    pc.dim("  For PDFs it can also read the embedded images and write them into the Markdown.")
   );
 
   const markitdown = await detectMarkitdown();
@@ -210,8 +255,33 @@ async function runDocumentToMarkdownTool(): Promise<void> {
   });
   if (p.isCancel(cleanup)) return;
 
-  const resolved = cleanup ? await resolveToolModel() : null;
-  if (cleanup && !resolved) return;
+  // Only PDFs expose their embedded images to inspection, so the question is
+  // meaningless for every other format.
+  const isPdf = extname(filePath).toLowerCase() === ".pdf";
+  let figures = false;
+
+  if (isPdf) {
+    p.log.info(
+      `${c.dim("▸")} ${pc.bold("Figures")}\n` +
+      pc.dim("  markitdown reads a PDF's text layer and ignores everything drawn on it.\n") +
+      pc.dim("  veneko can crop each figure out and have a vision model read it: diagrams\n") +
+      pc.dim("  become Mermaid, circuits become component and connection lists, charts\n") +
+      pc.dim("  become tables, photos get described — each one placed where it appeared.\n") +
+      pc.dim("  Both embedded images and vector drawings are found, so diagrams exported\n") +
+      pc.dim("  from Visio, draw.io or TikZ are picked up too.")
+    );
+
+    const wantFigures = await p.confirm({
+      message: "Detect figures in the PDF and convert them too?",
+      initialValue: true,
+    });
+    if (p.isCancel(wantFigures)) return;
+    figures = wantFigures;
+  }
+
+  // Figures need a vision model even when the formatting pass is skipped.
+  const resolved = cleanup || figures ? await resolveToolModel() : null;
+  if ((cleanup || figures) && !resolved) return;
 
   p.note(
     [
@@ -219,13 +289,21 @@ async function runDocumentToMarkdownTool(): Promise<void> {
       `${pc.bold("Output")}   ${pc.dim(outputPath)}`,
       `${pc.bold("Extract")}  ${pc.dim(markitdown.label)}`,
       `${pc.bold("Format")}   ${
-        resolved
+        cleanup && resolved
           ? `${c.highlight(getModelLabel(resolved.provider, resolved.model))} ${pc.dim(`(${resolved.provider})`)}`
           : pc.dim("skipped — raw markitdown output")
+      }`,
+      `${pc.bold("Figures")}  ${
+        figures
+          ? c.highlight("on")
+          : pc.dim(isPdf ? "off" : "not available for this format")
       }`,
       "",
       pc.dim("markitdown takes about ten seconds to start up before it converts anything."),
       pc.dim("Long documents are then formatted in fragments, one model request each."),
+      ...(figures
+        ? [pc.dim("Every detected image costs one extra vision request on top of that.")]
+        : []),
     ].join("\n"),
     pc.bold("▸ Conversion summary")
   );
@@ -244,13 +322,19 @@ async function runDocumentToMarkdownTool(): Promise<void> {
       filePath,
       outputPath,
       markitdownCommand: markitdown,
-      raw: !resolved,
+      raw: !cleanup,
+      figures,
       provider: resolved?.provider ?? "openai",
       model: resolved?.model ?? "",
       apiKey: resolved?.apiKey ?? "",
       onStage: (stage) => {
+        if (stage === "scanning-figures") s.message(`${c.dim("▸")} Scanning pages for images...`);
+        if (stage === "describing-figures") s.message(`${c.dim("▸")} Reading figures...`);
         if (stage === "formatting") s.message(`${c.dim("▸")} Formatting with AI...`);
         if (stage === "writing") s.message(`${c.dim("▸")} Writing Markdown...`);
+      },
+      onFigureDone: ({ completed, total }) => {
+        s.message(`${c.dim("▸")} Reading figures... ${c.highlight(`${completed}/${total}`)}`);
       },
       onChunkDone: ({ completed, total }) => {
         s.message(`${c.dim("▸")} Formatting with AI... ${c.highlight(`${completed}/${total}`)}`);
@@ -268,6 +352,8 @@ async function runDocumentToMarkdownTool(): Promise<void> {
     } else {
       s.stop(`${c.success("✔")} Extracted ${result.rawChars} characters.`);
     }
+
+    if (figures) reportFigures(result);
 
     p.log.success(`${c.success("✔")} Saved to ${c.highlight(result.outputPath)}`);
   } catch (err) {
@@ -720,7 +806,7 @@ export async function runToolsMenu(): Promise<void> {
         {
           value: "document-to-markdown",
           label: "Document to Markdown",
-          hint: "Word, Excel, PowerPoint, EPUB and more, via markitdown + AI cleanup",
+          hint: "Word, Excel, PowerPoint, EPUB, PDF — text plus figures, via markitdown + AI",
         },
         {
           value: "pdf-to-markdown",

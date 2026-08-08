@@ -1,9 +1,7 @@
-import { readFile, writeFile } from "fs/promises";
-import { createRequire } from "module";
-import { dirname, join, sep } from "path";
-import { createCanvas } from "@napi-rs/canvas";
-import { getDocument, type PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { writeFile } from "fs/promises";
+import type { PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { transcribeImage } from "../ai/vision.js";
+import { openPdfDocument, renderRegionToJpeg, RENDERED_IMAGE_MIME } from "./pdf-render.js";
 import type { ProviderId } from "../config/providers.js";
 
 export const DEFAULT_TRANSCRIPTION_PROMPT = `Transcribe this book page to pure Markdown.
@@ -50,45 +48,12 @@ interface PageResult {
 
 const DEFAULT_DPI = 200;
 const DEFAULT_CONCURRENCY = 3;
-const PDF_POINTS_PER_INCH = 72;
 /** Every current vision model downscales past roughly this size. */
 const DEFAULT_MAX_EDGE = 1600;
 const DEFAULT_JPEG_QUALITY = 85;
-export const PAGE_IMAGE_MIME = "image/jpeg";
+export const PAGE_IMAGE_MIME = RENDERED_IMAGE_MIME;
 
-/**
- * pdf.js loads fonts, character maps, ICC profiles and its image-codec wasm
- * modules on demand. The wasm ones matter most here: scanned pages are usually
- * JBIG2 or JPEG 2000, which fail to decode without them.
- *
- * Paths are resolved from the installed package because this file is bundled
- * while pdfjs-dist stays external. pdf.js reads them through its Node
- * file-system loader, so they must be plain paths rather than file:// URLs, and
- * it validates a trailing forward slash even on Windows.
- */
-function pdfAssetPaths(): {
-  standardFontDataUrl: string;
-  cMapUrl: string;
-  iccUrl: string;
-  wasmUrl: string;
-} {
-  const require = createRequire(import.meta.url);
-  const packageRoot = dirname(require.resolve("pdfjs-dist/package.json"));
-  const assetDir = (name: string) => `${join(packageRoot, name).split(sep).join("/")}/`;
-
-  return {
-    standardFontDataUrl: assetDir("standard_fonts"),
-    cMapUrl: assetDir("cmaps"),
-    iccUrl: assetDir("iccs"),
-    wasmUrl: assetDir("wasm"),
-  };
-}
-
-/**
- * Renders one page to a base64 JPEG. The requested DPI is capped so the longest
- * side stays within maxEdge — beyond that, providers downscale the image
- * themselves, so the extra pixels only cost upload size and tokens.
- */
+/** Renders one whole page to a base64 JPEG. */
 async function renderPageToImage(
   doc: PDFDocumentProxy,
   pageNumber: number,
@@ -97,23 +62,7 @@ async function renderPageToImage(
   jpegQuality: number
 ): Promise<string> {
   const page = await doc.getPage(pageNumber);
-
-  const unscaled = page.getViewport({ scale: 1 });
-  const longestSidePt = Math.max(unscaled.width, unscaled.height);
-  const scale = Math.min(dpi / PDF_POINTS_PER_INCH, maxEdge / longestSidePt);
-
-  const viewport = page.getViewport({ scale });
-  const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-  const context = canvas.getContext("2d");
-
-  // PDF pages are transparent; without a white base, scans render as black.
-  context.fillStyle = "white";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  await page.render({ canvasContext: context, viewport, canvas }).promise;
-  page.cleanup();
-
-  return canvas.toBuffer(PAGE_IMAGE_MIME, jpegQuality).toString("base64");
+  return renderRegionToJpeg(page, { dpi, maxEdge, jpegQuality });
 }
 
 function buildMarkdown(results: PageResult[]): string {
@@ -149,9 +98,7 @@ export async function convertPdfToMarkdown(
     onPageDone,
   } = options;
 
-  const data = new Uint8Array(await readFile(pdfPath));
-  const loadingTask = getDocument({ data, ...pdfAssetPaths(), cMapPacked: true });
-  const doc = await loadingTask.promise;
+  const { doc, loadingTask } = await openPdfDocument(pdfPath);
 
   const firstPage = Math.max(1, options.firstPage ?? 1);
   const lastPage = Math.min(doc.numPages, options.lastPage ?? doc.numPages);

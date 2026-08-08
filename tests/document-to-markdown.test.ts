@@ -12,6 +12,8 @@ vi.mock("../src/tools/markitdown.js", () => ({
 }));
 
 const {
+  cleanFigureAnswer,
+  isNotAFigure,
   convertDocumentToMarkdown,
   splitIntoChunks,
   stripOuterFence,
@@ -255,5 +257,67 @@ describe("convertDocumentToMarkdown", () => {
     extractMarkdown.mockRejectedValue(new Error("markitdown failed."));
 
     await expect(convertDocumentToMarkdown(baseOptions())).rejects.toThrow(/markitdown failed/);
+  });
+});
+
+describe("cleanFigureAnswer", () => {
+  it("keeps a mermaid fence, since the fence is the content", () => {
+    const answer = "```mermaid\nflowchart TD\n  A --> B\n```";
+    expect(cleanFigureAnswer(answer)).toBe(answer);
+  });
+
+  it("keeps a fenced code block with a language tag", () => {
+    const answer = "```python\nprint('hi')\n```";
+    expect(cleanFigureAnswer(answer)).toBe(answer);
+  });
+
+  it("unwraps a fence the model put around a whole markdown answer", () => {
+    expect(cleanFigureAnswer("```markdown\n## Figure\n\nText.\n```")).toBe("## Figure\n\nText.");
+  });
+
+  it("unwraps an untagged fence wrapped around the answer", () => {
+    expect(cleanFigureAnswer("```\n## Figure\n\nText.\n```")).toBe("## Figure\n\nText.");
+  });
+
+  it("leaves plain markdown alone", () => {
+    expect(cleanFigureAnswer("  A photograph of a bridge.  ")).toBe("A photograph of a bridge.");
+  });
+
+  it("leaves a mermaid block followed by prose alone", () => {
+    const answer = "```mermaid\nflowchart TD\n  A --> B\n```\n\nThe diagram shows two states.";
+    expect(cleanFigureAnswer(answer)).toBe(answer);
+  });
+
+  it("handles an empty answer", () => {
+    expect(cleanFigureAnswer("   ")).toBe("");
+  });
+});
+
+describe("isNotAFigure", () => {
+  it("recognizes the bare sentinel", () => {
+    expect(isNotAFigure("NOT_A_FIGURE")).toBe(true);
+  });
+
+  it("tolerates surrounding whitespace and a full stop", () => {
+    expect(isNotAFigure("  NOT_A_FIGURE.  ")).toBe(true);
+  });
+
+  it("tolerates a short wrapper sentence", () => {
+    expect(isNotAFigure("NOT_A_FIGURE - a table border")).toBe(true);
+  });
+
+  it("does not treat a long description that quotes it as a rejection", () => {
+    const answer =
+      "The middle node of this state machine is labelled NOT_A_FIGURE, which is " +
+      "part of the diagram rather than a verdict about the crop.";
+    expect(isNotAFigure(answer)).toBe(false);
+  });
+
+  it("is false for ordinary content", () => {
+    expect(isNotAFigure("```mermaid\nflowchart TD\n  A --> B\n```")).toBe(false);
+  });
+
+  it("is false for an empty answer, which is a failure and not a rejection", () => {
+    expect(isNotAFigure("   ")).toBe(false);
   });
 });
