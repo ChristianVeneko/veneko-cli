@@ -40,6 +40,13 @@ interface ProviderRequest {
   extractText: (payload: unknown) => string;
 }
 
+export function textFromGeminiShape(payload: unknown): string {
+  const parts =
+    (payload as { candidates?: { content?: { parts?: { text?: string }[] } }[] })
+      .candidates?.[0]?.content?.parts ?? [];
+  return parts.map((part) => part.text ?? "").join("");
+}
+
 function textFromOpenAiShape(payload: unknown): string {
   const choice = (payload as { choices?: { message?: { content?: unknown } }[] }).choices?.[0];
   const content = choice?.message?.content;
@@ -162,12 +169,7 @@ function buildRequest(req: CompletionRequest): ProviderRequest {
           ],
           generationConfig: { maxOutputTokens: maxTokens },
         },
-        extractText: (payload) => {
-          const parts =
-            (payload as { candidates?: { content?: { parts?: { text?: string }[] } }[] })
-              .candidates?.[0]?.content?.parts ?? [];
-          return parts.map((part) => part.text ?? "").join("");
-        },
+        extractText: textFromGeminiShape,
       };
   }
 }
@@ -191,30 +193,41 @@ async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export interface PostOptions {
+  provider: ProviderId;
+  url: string;
+  headers: Record<string, string>;
+  /** A JSON string for the chat endpoints, or FormData for a file upload. */
+  body: string | FormData;
+  timeoutMs?: number;
+}
+
 /**
- * Sends one prompt — optionally with an image — to the given provider and
- * returns the text response. Retries transient failures with exponential
- * backoff; authentication and unknown-model errors fail immediately because
- * retrying them only wastes time.
+ * POSTs to a provider and returns the parsed JSON body. Transient failures are
+ * retried with exponential backoff; authentication and unknown-model errors
+ * fail immediately because retrying them only wastes time.
+ *
+ * Shared by every provider call so the retry policy and the error messages are
+ * written once — a transcription that dies on a 429 should read the same as a
+ * completion that does.
  */
-export async function complete(req: CompletionRequest): Promise<string> {
-  const { url, headers, body, extractText } = buildRequest(req);
-  const timeoutMs = req.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  let lastError: Error = new ProviderError(`${req.provider} request failed.`);
+export async function postWithRetry(options: PostOptions): Promise<unknown> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let lastError: Error = new ProviderError(`${options.provider} request failed.`);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(url, {
+      const response = await fetch(options.url, {
         method: "POST",
-        headers,
-        body: JSON.stringify(body),
+        headers: options.headers,
+        body: options.body,
         signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
         const error = new ProviderError(
-          describeHttpError(req.provider, response.status, errorBody),
+          describeHttpError(options.provider, response.status, errorBody),
           response.status
         );
 
@@ -226,8 +239,7 @@ export async function complete(req: CompletionRequest): Promise<string> {
         throw error;
       }
 
-      const payload: unknown = await response.json();
-      return extractText(payload).trim();
+      return (await response.json()) as unknown;
     } catch (err) {
       if (err instanceof ProviderError && !RETRYABLE_STATUS.has(err.status ?? 0)) {
         throw err;
@@ -240,4 +252,22 @@ export async function complete(req: CompletionRequest): Promise<string> {
   }
 
   throw lastError;
+}
+
+/**
+ * Sends one prompt — optionally with an image — to the given provider and
+ * returns the text response.
+ */
+export async function complete(req: CompletionRequest): Promise<string> {
+  const { url, headers, body, extractText } = buildRequest(req);
+
+  const payload = await postWithRetry({
+    provider: req.provider,
+    url,
+    headers,
+    body: JSON.stringify(body),
+    timeoutMs: req.timeoutMs,
+  });
+
+  return extractText(payload).trim();
 }

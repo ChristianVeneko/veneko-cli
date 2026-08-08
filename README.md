@@ -170,7 +170,7 @@ Expand-Archive veneko-cli-*.zip -DestinationPath . ; cd veneko-cli-*
 | **Python 3.10+** | Las dos herramientas de abajo | `brew install python` · `sudo apt install python3` · `winget install Python.Python.3.12` |
 | **markitdown** | Convertir documentos a Markdown | `pipx install 'markitdown[all]'` |
 | **yt-dlp** | Descargar video y audio | `brew install yt-dlp` · `pipx install yt-dlp` · `winget install yt-dlp.yt-dlp` |
-| **ffmpeg** | Extraer audio y unir video de alta calidad | `brew install ffmpeg` · `sudo apt install ffmpeg` · `winget install Gyan.FFmpeg` |
+| **ffmpeg** | Extraer audio, unir video de alta calidad y preparar grabaciones para transcribir | `brew install ffmpeg` · `sudo apt install ffmpeg` · `winget install Gyan.FFmpeg` |
 
 El instalador se encarga de todo esto por vos. Y si algo queda faltando, `veneko doctor` te lo dice con el comando exacto para tu sistema.
 
@@ -245,6 +245,17 @@ Convierte PDF, DOCX, PPTX, XLSX, EPUB, HTML, CSV y bastante más a Markdown limp
 ### PDF escaneado a Markdown
 
 Para PDFs que son **imágenes de páginas** y no tienen capa de texto. Renderiza cada página y se la manda a un modelo de visión para que la transcriba. Necesita una API key configurada.
+
+### Audio a Markdown
+
+Transcribe notas de voz y grabaciones, y las deja como Markdown con puntuación y párrafos. Arrastrá **varios audios de una** al terminal y cada uno sale como su propio `.md` en la carpeta que elijas.
+
+- Formatos: MP3, OGG, Opus, M4A, MP4, AAC, WAV, FLAC, WebM y MPGA
+- Transcribe con OpenAI (GPT-4o Transcribe o Whisper) o con Gemini. **Claude y Grok no reciben audio**, así que no aparecen acá
+- Podés decirle el idioma en dos letras (`es`, `en`) o dejar que lo detecte
+- El formateo a Markdown es un segundo paso opcional, con el modelo de chat que tengas configurado
+
+Si tenés **ffmpeg**, cada grabación se reencodea a 16 kHz mono y se corta en segmentos de 15 minutos antes de mandarla. Eso es lo que hace que funcionen los audios largos y los formatos que el proveedor no lee. Sin ffmpeg igual anda, pero el archivo se sube entero: una grabación larga puede volver cortada.
 
 ### Descargar video y audio
 
@@ -333,6 +344,8 @@ Te revisa todo y te da el comando exacto para lo que falte.
 | `markitdown: not installed` | Instalalo con `pipx install 'markitdown[all]'`. Necesita Python 3.10+. |
 | El audio no se descarga | Falta ffmpeg. `brew install ffmpeg` en macOS, `winget install Gyan.FFmpeg` en Windows. |
 | yt-dlp falla en YouTube | YouTube cambió su reproductor. Actualizá con `pipx upgrade yt-dlp`. |
+| La transcripción de un audio largo sale cortada | Falta ffmpeg, así que el archivo se subió entero y el modelo llegó a su límite de salida. Instalalo y volvé a correrlo. |
+| No aparece tu proveedor al transcribir | Solo OpenAI y Google reciben audio. Configurá una key de alguno de los dos en `veneko config`. |
 | `externally-managed-environment` al usar pip | Es correcto que falle: usá **pipx**, que instala aislado sin romper el Python del sistema. |
 
 Si nada de esto lo resuelve, [abrí un issue](https://github.com/ChristianVeneko/veneko-cli/issues) con la salida de `veneko doctor` y el log del instalador.
@@ -366,7 +379,7 @@ src/
 ├── generators/    generación de proyectos y features
 ├── prompts/       los flujos interactivos
 ├── templates/     los templates que se copian al proyecto nuevo
-├── tools/         markitdown, yt-dlp, PDF escaneado
+├── tools/         markitdown, yt-dlp, PDF escaneado, audio
 └── utils/         PATH, filesystem, git, plataforma
 scripts/           instaladores y desinstaladores
 tests/             la suite de Vitest

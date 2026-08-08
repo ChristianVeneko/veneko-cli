@@ -1,7 +1,12 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { c } from "../utils/logger.js";
-import { PROVIDERS, getModelLabel, type ProviderId } from "../config/providers.js";
+import {
+  PROVIDERS,
+  getModelLabel,
+  transcriptionModels,
+  type ProviderId,
+} from "../config/providers.js";
 import {
   configuredProviders,
   loadConfig,
@@ -83,4 +88,56 @@ export async function resolveToolModel(): Promise<ResolvedModel | null> {
   }
 
   return { provider, model, apiKey };
+}
+
+/**
+ * Picks a model that can listen to audio, which is a narrower question than
+ * resolveToolModel answers: only OpenAI and Google take audio at all, so the
+ * saved default is no help — it usually points at a chat model, and may point
+ * at a provider with no audio input whatsoever.
+ */
+export async function resolveTranscriptionModel(): Promise<ResolvedModel | null> {
+  const config = await loadConfig();
+  const available = configuredProviders(config).filter(
+    (id) => transcriptionModels(id).length > 0
+  );
+
+  if (available.length === 0) {
+    p.log.error(
+      `${c.error("✖ No provider that can transcribe audio is configured.")}\n` +
+      pc.dim("  Only OpenAI and Google accept audio — Claude and Grok have no audio input.\n") +
+      pc.dim("  Add a key for one of them under Configuration > Credentials.")
+    );
+    return null;
+  }
+
+  let provider = available[0];
+
+  if (available.length > 1) {
+    const choice = await p.select({
+      message: "Transcription provider",
+      options: available.map((id) => ({
+        value: id as string,
+        label: PROVIDERS.find((item) => item.id === id)?.label ?? id,
+      })),
+    });
+    if (p.isCancel(choice)) return null;
+    provider = choice as ProviderId;
+  }
+
+  const models = transcriptionModels(provider);
+  const modelChoice = await p.select({
+    message: "Transcription model",
+    options: models.map((model) => ({
+      value: model.id,
+      label: model.label,
+      hint: model.hint,
+    })),
+  });
+  if (p.isCancel(modelChoice)) return null;
+
+  const apiKey = resolveApiKey(config, provider);
+  if (!apiKey) return null;
+
+  return { provider, model: modelChoice as string, apiKey };
 }

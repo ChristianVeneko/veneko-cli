@@ -70,6 +70,40 @@ export const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
+export interface TranscriptionModelInfo {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+/**
+ * Models that accept audio, which is a different list from the chat one: OpenAI
+ * transcribes through dedicated speech models on their own endpoint, while
+ * Gemini takes audio in an ordinary request. Anthropic and xAI have no audio
+ * input at all, so they are absent rather than listed as unusable.
+ */
+export const TRANSCRIPTION_MODELS: Partial<Record<ProviderId, TranscriptionModelInfo[]>> = {
+  openai: [
+    { id: "gpt-4o-transcribe", label: "GPT-4o Transcribe", hint: "most accurate" },
+    { id: "gpt-4o-mini-transcribe", label: "GPT-4o mini Transcribe", hint: "cheaper, nearly as good" },
+    { id: "whisper-1", label: "Whisper", hint: "cheapest" },
+  ],
+  google: [
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", hint: "fast and cheap" },
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", hint: "most accurate" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  ],
+};
+
+export function transcriptionModels(id: ProviderId): TranscriptionModelInfo[] {
+  return TRANSCRIPTION_MODELS[id] ?? [];
+}
+
+/** Same fallback as getModelLabel: a saved model may no longer be in the registry. */
+export function getTranscriptionModelLabel(providerId: ProviderId, modelId: string): string {
+  return transcriptionModels(providerId).find((m) => m.id === modelId)?.label ?? modelId;
+}
+
 export function getProvider(id: ProviderId): ProviderInfo {
   const provider = PROVIDERS.find((p) => p.id === id);
   if (!provider) {

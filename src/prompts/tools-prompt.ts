@@ -1,12 +1,21 @@
+import { stat } from "fs/promises";
 import { basename, extname, isAbsolute, join, resolve } from "path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { c } from "../utils/logger.js";
 import { ensureDir, fileExists } from "../utils/fs.js";
+import { parseDraggedPaths } from "../utils/dragged-paths.js";
 import { listMediaDestinations, listOutputDestinations } from "../utils/user-dirs.js";
-import { getModelLabel } from "../config/providers.js";
-import { resolveToolModel } from "./model-prompt.js";
+import { getModelLabel, getTranscriptionModelLabel } from "../config/providers.js";
+import { resolveToolModel, resolveTranscriptionModel } from "./model-prompt.js";
 import { convertPdfToMarkdown } from "../tools/pdf-to-markdown.js";
+import {
+  convertAudioToMarkdown,
+  FFMPEG_AUDIO_HINT,
+  type AudioToMarkdownResult,
+  type ModelCredentials,
+} from "../tools/audio-to-markdown.js";
+import { AUDIO_EXTENSIONS, isAudioFile } from "../tools/audio-prepare.js";
 import {
   convertDocumentToMarkdown,
   type DocumentToMarkdownResult,
@@ -793,6 +802,335 @@ async function runMediaDownloadTool(): Promise<void> {
   }
 }
 
+interface AudioJob {
+  audioPath: string;
+  outputPath: string;
+  size: number;
+}
+
+/**
+ * Reads one line of dragged files and keeps the ones veneko can actually
+ * convert. Everything dropped is reported back, because a path that silently
+ * vanished from a batch of twenty is a bug the user finds hours later.
+ */
+async function promptAudioPaths(): Promise<{ path: string; size: number }[] | null> {
+  const input = await p.text({
+    message: "Drag the audio files here, or type their paths",
+    placeholder: "./voice-note.ogg ./meeting.mp3",
+    validate: (value) => {
+      if (!value || value.trim().length === 0) return "At least one audio file is required.";
+      return undefined;
+    },
+  });
+
+  if (p.isCancel(input)) return null;
+
+  const paths = parseDraggedPaths(input);
+  const files: { path: string; size: number }[] = [];
+  const missing: string[] = [];
+  const unsupported: string[] = [];
+
+  for (const path of paths) {
+    if (!(await fileExists(path))) {
+      missing.push(path);
+      continue;
+    }
+    if (!isAudioFile(path)) {
+      unsupported.push(path);
+      continue;
+    }
+    files.push({ path, size: (await stat(path)).size });
+  }
+
+  if (missing.length > 0) {
+    p.log.error(
+      `${c.error("✖ Not found:")}\n` +
+      missing.map((path) => pc.dim(`  ${path}`)).join("\n") +
+      pc.dim("\n  A path with spaces that your terminal did not quote splits in two — ") +
+      pc.dim("wrap it in quotes and try again.")
+    );
+  }
+
+  if (unsupported.length > 0) {
+    p.log.warn(
+      `${c.warn("⚠ Not an audio format veneko handles:")}\n` +
+      unsupported.map((path) => pc.dim(`  ${basename(path)}`)).join("\n") +
+      pc.dim(`\n  Supported: ${AUDIO_EXTENSIONS.join(" ")}`)
+    );
+  }
+
+  if (files.length === 0) {
+    p.log.error(`${c.error("✖")} Nothing left to convert.`);
+    return null;
+  }
+
+  if (missing.length > 0 || unsupported.length > 0) {
+    const proceed = await p.confirm({
+      message: `Continue with the ${files.length} file(s) that are usable?`,
+      initialValue: true,
+    });
+    if (p.isCancel(proceed) || !proceed) return null;
+  }
+
+  return files;
+}
+
+const OTHER_FOLDER = "__other__";
+
+async function promptOutputDir(): Promise<string | null> {
+  const destinations = await listOutputDestinations();
+
+  const choice = await p.select({
+    message: "Where do you want to save the Markdown files?",
+    options: [
+      ...destinations.map((destination) => ({
+        value: destination.value,
+        label: destination.label,
+        hint: destination.path,
+      })),
+      { value: OTHER_FOLDER, label: "Another folder", hint: "type or drag the path" },
+    ],
+  });
+
+  if (p.isCancel(choice)) return null;
+
+  if (choice !== OTHER_FOLDER) {
+    return destinations.find((item) => item.value === choice)?.path ?? null;
+  }
+
+  const input = await p.text({
+    message: "Output folder",
+    placeholder: "./transcripts",
+    validate: (value) => {
+      if (!value || value.trim().length === 0) return "A folder path is required.";
+      return undefined;
+    },
+  });
+  if (p.isCancel(input)) return null;
+
+  return cleanPath(input);
+}
+
+/**
+ * Two recordings with the same name in different folders would write to the
+ * same Markdown file, and the second would quietly overwrite the first.
+ */
+function uniqueOutputPath(taken: Set<string>, outputDir: string, audioPath: string): string {
+  const stem = basename(audioPath, extname(audioPath));
+  let candidate = join(outputDir, `${stem}.md`);
+  let suffix = 2;
+
+  while (taken.has(candidate)) {
+    candidate = join(outputDir, `${stem}-${suffix}.md`);
+    suffix += 1;
+  }
+
+  taken.add(candidate);
+  return candidate;
+}
+
+/** Drops the jobs whose Markdown already exists, once the user has said no to overwriting. */
+async function resolveOverwrites(jobs: AudioJob[]): Promise<AudioJob[] | null> {
+  const existing: AudioJob[] = [];
+  for (const job of jobs) {
+    if (await fileExists(job.outputPath)) existing.push(job);
+  }
+
+  if (existing.length === 0) return jobs;
+
+  const overwrite = await p.confirm({
+    message: `${existing.length} Markdown file(s) already exist there. Overwrite them?`,
+    initialValue: false,
+  });
+  if (p.isCancel(overwrite)) return null;
+  if (overwrite) return jobs;
+
+  const remaining = jobs.filter((job) => !existing.includes(job));
+  if (remaining.length === 0) {
+    p.log.warn(`${c.warn("⚠")} Every file was already converted. Nothing to do.`);
+    return null;
+  }
+
+  p.log.info(`${c.dim("▸")} Skipping ${existing.length} file(s) that already exist.`);
+  return remaining;
+}
+
+/** Reports the parts of one recording that did not come through cleanly. */
+function reportAudioResult(name: string, result: AudioToMarkdownResult): void {
+  if (result.failedSegments.length > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} ${name}: ${result.failedSegments.length} segment(s) failed.\n` +
+      pc.dim("  Each one is marked in the Markdown with an HTML comment, and the rest of\n") +
+      pc.dim("  the recording was transcribed normally.")
+    );
+  }
+
+  if (result.failedChunks.length > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} ${name}: ${result.failedChunks.length} fragment(s) were left unformatted.\n` +
+      pc.dim("  Their raw transcript was kept, so no words were lost.")
+    );
+  }
+}
+
+async function runAudioToMarkdownTool(): Promise<void> {
+  p.log.info(
+    `${c.dim("▸")} ${pc.bold("Audio to Markdown")}\n` +
+    pc.dim("  Transcribes voice notes and recordings, then formats them as Markdown.\n") +
+    pc.dim("  Drop several files at once and each one becomes its own .md.\n") +
+    pc.dim("  MP3, OGG and Opus voice notes, plus M4A, WAV, FLAC and WebM.")
+  );
+
+  const files = await promptAudioPaths();
+  if (!files) return;
+
+  const outputDir = await promptOutputDir();
+  if (!outputDir) return;
+
+  const language = await p.text({
+    message: "Language of the recordings (leave empty to detect it)",
+    placeholder: "es",
+    defaultValue: "",
+    validate: (value) => {
+      const raw = (value ?? "").trim();
+      if (raw.length === 0) return undefined;
+      return /^[a-z]{2}$/i.test(raw) ? undefined : "Use a two-letter code like es, en or pt.";
+    },
+  });
+  if (p.isCancel(language)) return;
+
+  const transcription = await resolveTranscriptionModel();
+  if (!transcription) return;
+
+  const wantsCleanup = await p.confirm({
+    message: "Format the transcript with AI?",
+    initialValue: true,
+  });
+  if (p.isCancel(wantsCleanup)) return;
+
+  // A speech model returns one long run of text. Punctuation, paragraphs and
+  // headings are a second, ordinary chat request.
+  const cleanup = wantsCleanup ? await resolveToolModel() : null;
+  if (wantsCleanup && !cleanup) return;
+
+  const ffmpeg = await detectFfmpeg();
+  if (!ffmpeg) {
+    p.log.warn(
+      `${c.warn("⚠")} ${FFMPEG_AUDIO_HINT}\n` +
+      pc.dim("  Without it each recording is uploaded whole, so a long one may come back\n") +
+      pc.dim("  cut short and formats the provider does not read will be rejected.")
+    );
+  }
+
+  const taken = new Set<string>();
+  let jobs: AudioJob[] = files.map((file) => ({
+    audioPath: file.path,
+    size: file.size,
+    outputPath: uniqueOutputPath(taken, outputDir, file.path),
+  }));
+
+  const kept = await resolveOverwrites(jobs);
+  if (!kept) return;
+  jobs = kept;
+
+  const totalBytes = jobs.reduce((sum, job) => sum + job.size, 0);
+  const shown = jobs.slice(0, 5);
+
+  p.note(
+    [
+      `${pc.bold("Files")}     ${c.highlight(String(jobs.length))} ${pc.dim(`(${formatBytes(totalBytes)})`)}`,
+      ...shown.map((job) => pc.dim(`  ${basename(job.audioPath)}`)),
+      ...(jobs.length > shown.length ? [pc.dim(`  ...and ${jobs.length - shown.length} more`)] : []),
+      `${pc.bold("Output")}    ${pc.dim(outputDir)}`,
+      `${pc.bold("Language")}  ${language.trim() ? c.highlight(language.trim()) : pc.dim("auto-detected")}`,
+      `${pc.bold("Speech")}    ${c.highlight(getTranscriptionModelLabel(transcription.provider, transcription.model))} ${pc.dim(`(${transcription.provider})`)}`,
+      `${pc.bold("Format")}    ${
+        cleanup
+          ? `${c.highlight(getModelLabel(cleanup.provider, cleanup.model))} ${pc.dim(`(${cleanup.provider})`)}`
+          : pc.dim("skipped — raw transcript")
+      }`,
+      `${pc.bold("Split")}     ${
+        ffmpeg ? pc.dim("ffmpeg, 15-minute segments") : pc.dim("no ffmpeg — uploaded whole")
+      }`,
+      "",
+      pc.dim("Transcription is billed by the minute of audio, not by the file."),
+    ].join("\n"),
+    pc.bold("▸ Transcription summary")
+  );
+
+  const proceed = await p.confirm({ message: "Start transcription?", initialValue: true });
+  if (p.isCancel(proceed) || !proceed) {
+    p.log.warn(`${c.warn("⚠")} Transcription cancelled.`);
+    return;
+  }
+
+  await ensureDir(outputDir);
+
+  const converted: string[] = [];
+  const failed: { name: string; reason: string }[] = [];
+
+  for (const [index, job] of jobs.entries()) {
+    const name = basename(job.audioPath);
+    const counter = jobs.length > 1 ? `${c.highlight(`${index + 1}/${jobs.length}`)} ` : "";
+
+    const s = p.spinner();
+    s.start(`${c.dim("▸")} ${counter}${name} — preparing...`);
+
+    try {
+      const result = await convertAudioToMarkdown({
+        audioPath: job.audioPath,
+        outputPath: job.outputPath,
+        transcription: transcription as ModelCredentials,
+        cleanup: cleanup ? (cleanup as ModelCredentials) : undefined,
+        language: language.trim() || undefined,
+        ffmpegPath: ffmpeg,
+        onStage: (stage) => {
+          if (stage === "preparing") s.message(`${c.dim("▸")} ${counter}${name} — preparing...`);
+          if (stage === "transcribing") s.message(`${c.dim("▸")} ${counter}${name} — transcribing...`);
+          if (stage === "formatting") s.message(`${c.dim("▸")} ${counter}${name} — formatting...`);
+          if (stage === "writing") s.message(`${c.dim("▸")} ${counter}${name} — writing...`);
+        },
+        onSegmentDone: ({ completed, total }) => {
+          if (total > 1) {
+            s.message(
+              `${c.dim("▸")} ${counter}${name} — transcribing... ${c.highlight(`${completed}/${total}`)}`
+            );
+          }
+        },
+        onChunkDone: ({ completed, total }) => {
+          if (total > 1) {
+            s.message(
+              `${c.dim("▸")} ${counter}${name} — formatting... ${c.highlight(`${completed}/${total}`)}`
+            );
+          }
+        },
+      });
+
+      s.stop(`${c.success("✔")} ${name} ${pc.dim(`→ ${basename(result.outputPath)}`)}`);
+      reportAudioResult(name, result);
+      converted.push(result.outputPath);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      s.stop(`${c.error("✖")} ${name} failed.`);
+      p.log.error(reason);
+      failed.push({ name, reason });
+    }
+  }
+
+  if (converted.length > 0) {
+    p.log.success(
+      `${c.success("✔")} Converted ${converted.length} of ${jobs.length} recording(s) into ${c.highlight(outputDir)}`
+    );
+  }
+
+  if (failed.length > 0) {
+    p.log.warn(
+      `${c.warn("⚠")} ${failed.length} recording(s) failed:\n` +
+      failed.map((item) => pc.dim(`  ${item.name}`)).join("\n")
+    );
+  }
+}
+
 export async function runToolsMenu(): Promise<void> {
   for (;;) {
     const choice = await p.select({
@@ -813,6 +1151,11 @@ export async function runToolsMenu(): Promise<void> {
           label: "Scanned PDF to Markdown",
           hint: "image-only PDFs, transcribed by a vision model",
         },
+        {
+          value: "audio-to-markdown",
+          label: "Audio to Markdown",
+          hint: "voice notes and recordings — MP3, OGG, Opus and more, in batch",
+        },
         { value: BACK, label: "Back", hint: "return to main menu" },
       ],
     });
@@ -829,6 +1172,10 @@ export async function runToolsMenu(): Promise<void> {
 
     if (choice === "pdf-to-markdown") {
       await runPdfToMarkdownTool();
+    }
+
+    if (choice === "audio-to-markdown") {
+      await runAudioToMarkdownTool();
     }
   }
 }
